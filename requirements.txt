@@ -7,4 +7,4 @@ lxml>=5.0.0
 python-docx>=1.1.0
 openpyxl>=3.1.0
 pytz>=2024.1
-# gunicorn>=21.2.0  -- removed: use Flask built-in server instead
+gunicorn>=21.2.0
