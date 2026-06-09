@@ -1,13 +1,15 @@
 """
-wsgi.py — WSGI entry point for Railway/gunicorn
+wsgi.py — Entry point for Railway
+Uses Flask's built-in server (no gunicorn dependency)
 """
 import sys
 import os
 
-# Add backend to Python path so imports work from project root
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend'))
 
 from app import app
 
 if __name__ == '__main__':
-    app.run()
+    port = int(os.environ.get('PORT', 5000))
+    print(f"Starting server on port {port}...")
+    app.run(host='0.0.0.0', port=port, debug=False)
