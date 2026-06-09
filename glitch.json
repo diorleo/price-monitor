@@ -1,0 +1,12 @@
+{
+  "enableYes": true,
+  "watch": {
+    "install": {
+      "include": ["requirements.txt"]
+    },
+    "restart": {
+      "include": ["*.py", "backend/**/*.py"]
+    }
+  },
+  "start": "python run.py"
+}
