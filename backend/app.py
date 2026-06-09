@@ -532,10 +532,14 @@ def _reschedule_cron():
 
 
 # ── 启动 ─────────────────────────────────────────────────────────────────────
-# 初始化数据库（gunicorn 启动时也会执行）
-init_db()
-seed_defaults()
-_reschedule_cron()
+# 初始化数据库（gunicorn 启动时也会执行，用 try/except 防止启动崩溃）
+try:
+    init_db()
+    seed_defaults()
+    _reschedule_cron()
+    logger.info("Database and scheduler initialized successfully")
+except Exception as e:
+    logger.error(f"Startup error: {e}", exc_info=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
