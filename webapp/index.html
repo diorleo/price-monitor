@@ -1,0 +1,1972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOZA RACING US Price Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ===== CSS Variables ===== */
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-card2: #22263a;
+  --border: #2d3148;
+  --accent: #e63946;
+  --accent2: #f4a261;
+  --green: #2dc653;
+  --red: #e63946;
+  --yellow: #f4a261;
+  --blue: #4895ef;
+  --purple: #9b72cf;
+  --text: #e8eaf0;
+  --text-muted: #8892a4;
+  --sidebar-w: 220px;
+  --header-h: 60px;
+  font-size: 14px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* ===== Header ===== */
+.header {
+  height: var(--header-h); background: var(--bg-card); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 24px; gap: 16px; flex-shrink: 0; z-index: 100;
+}
+.header-logo { display: flex; align-items: center; gap: 10px; }
+.header-logo .logo-icon { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.header-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: 0.5px; }
+.header-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.header-spacer { flex: 1; }
+.header-badge { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; font-size: 12px; color: var(--text-muted); }
+.header-badge span { color: var(--green); font-weight: 600; }
+.btn-crawl { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+.btn-crawl:hover { background: #c1121f; transform: translateY(-1px); }
+.btn-crawl.loading { background: #555; cursor: not-allowed; }
+
+/* ===== Layout ===== */
+.layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  width: var(--sidebar-w); background: var(--bg-card); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 16px 0; flex-shrink: 0; overflow-y: auto;
+}
+.nav-section-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 12px 20px 6px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer;
+  color: var(--text-muted); font-size: 13px; font-weight: 500; transition: all 0.15s; border-left: 3px solid transparent;
+}
+.nav-item:hover { background: var(--bg-card2); color: var(--text); }
+.nav-item.active { background: rgba(230, 57, 70, 0.12); color: var(--accent); border-left-color: var(--accent); }
+.nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+.nav-badge { margin-left: auto; background: var(--accent); color: white; border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 700; }
+
+/* ===== Main Content ===== */
+.main { flex: 1; overflow-y: auto; padding: 24px; }
+.page { display: none; animation: fadeIn 0.2s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Page Headers ===== */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-title { font-size: 20px; font-weight: 700; }
+.page-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+
+/* ===== Stats Cards ===== */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: var(--blue); }
+.stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 32px; font-weight: 800; margin-top: 8px; line-height: 1; }
+.stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.stat-card.red .stat-value { color: var(--red); }
+.stat-card.yellow .stat-value { color: var(--yellow); }
+.stat-card.green .stat-value { color: var(--green); }
+.stat-card.blue .stat-value { color: var(--blue); }
+
+/* ===== Tables ===== */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.card-title { font-size: 15px; font-weight: 600; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.search-input {
+  background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px;
+  color: var(--text); font-size: 13px; width: 220px; outline: none; transition: border-color 0.2s;
+}
+.search-input:focus { border-color: var(--blue); }
+.filter-select {
+  background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+  color: var(--text); font-size: 13px; outline: none; cursor: pointer;
+}
+.filter-select:focus { border-color: var(--blue); }
+.btn { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; color: var(--text); font-size: 13px; cursor: pointer; font-weight: 500; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--border); }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: white; }
+.btn.primary:hover { background: #357abd; }
+.btn.danger { background: rgba(230,57,70,0.15); border-color: var(--red); color: var(--red); }
+.btn.success { background: rgba(45,198,83,0.15); border-color: var(--green); color: var(--green); }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--bg-card2); color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; }
+th:hover { color: var(--text); }
+td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.sort-arrow { opacity: 0.4; font-size: 10px; margin-left: 4px; }
+th.sort-asc .sort-arrow, th.sort-desc .sort-arrow { opacity: 1; color: var(--blue); }
+
+/* Status Badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; padding: 3px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.badge-normal { background: rgba(45,198,83,0.15); color: var(--green); border: 1px solid rgba(45,198,83,0.3); }
+.badge-low { background: rgba(244,162,97,0.15); color: var(--yellow); border: 1px solid rgba(244,162,97,0.3); }
+.badge-high { background: rgba(72,149,239,0.15); color: var(--blue); border: 1px solid rgba(72,149,239,0.3); }
+.badge-critical { background: rgba(230,57,70,0.15); color: var(--red); border: 1px solid rgba(230,57,70,0.3); animation: pulse 2s infinite; }
+.badge-missing { background: rgba(155,114,207,0.15); color: var(--purple); border: 1px solid rgba(155,114,207,0.3); }
+.badge-unauth { background: rgba(255,80,0,0.15); color: #ff5000; border: 1px solid rgba(255,80,0,0.3); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+.price { font-family: 'Roboto Mono', 'Courier New', monospace; font-weight: 600; }
+.price-low { color: var(--yellow); }
+.price-high { color: var(--blue); }
+.price-critical { color: var(--red); font-weight: 800; }
+.diff-neg { color: var(--red); }
+.diff-pos { color: var(--green); }
+.link-icon { color: var(--blue); cursor: pointer; text-decoration: none; font-size: 15px; }
+.link-icon:hover { color: #7ec8e3; }
+
+/* Pagination */
+.pagination { display: flex; align-items: center; gap: 6px; padding: 14px 20px; border-top: 1px solid var(--border); justify-content: flex-end; }
+.page-btn { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--text-muted); cursor: pointer; font-size: 12px; }
+.page-btn:hover, .page-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
+.page-info { color: var(--text-muted); font-size: 12px; margin-right: auto; }
+
+/* Charts */
+.charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px; }
+.chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.chart-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+.chart-wrap { position: relative; }
+
+/* Dashboard Alert Banner */
+.alert-banner { background: rgba(230,57,70,0.1); border: 1px solid rgba(230,57,70,0.3); border-radius: 10px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.alert-banner.hidden { display: none; }
+
+/* Form Styles */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1/-1; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.form-input {
+  background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+  color: var(--text); font-size: 13px; outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--blue); }
+.form-actions { padding: 0 20px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; width: 560px; max-width: 90vw; max-height: 85vh; overflow-y: auto; transform: scale(0.95); transition: transform 0.2s; }
+.modal-overlay.open .modal { transform: scale(1); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 0; line-height: 1; }
+.modal-close:hover { color: var(--text); }
+
+/* Progress bar */
+.progress-wrap { background: var(--bg-card2); border-radius: 4px; height: 6px; overflow: hidden; margin-top: 4px; }
+.progress-bar { height: 100%; border-radius: 4px; transition: width 0.4s ease; background: var(--green); }
+
+/* Toast */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; font-size: 13px; animation: slideUp 0.3s ease; min-width: 260px; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.toast.success { border-color: var(--green); }
+.toast.error { border-color: var(--red); }
+.toast.warning { border-color: var(--yellow); }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* Channel cards */
+.channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 20px; }
+.channel-card { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.channel-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.channel-name { font-size: 14px; font-weight: 600; }
+.channel-url { font-size: 11px; color: var(--text-muted); word-break: break-all; margin-bottom: 10px; }
+.channel-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.meta-tag { background: var(--bg-card); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--text-muted); }
+.channel-actions { display: flex; gap: 6px; margin-top: 12px; }
+
+/* Log entries */
+.log-entry { display: flex; align-items: flex-start; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.log-entry:last-child { border-bottom: none; }
+.log-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+.log-dot.success { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.log-dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.log-dot.running { background: var(--blue); box-shadow: 0 0 6px var(--blue); animation: blink 1s infinite; }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.log-content { flex: 1; }
+.log-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.log-meta { font-size: 12px; color: var(--text-muted); }
+.log-details { font-size: 12px; color: var(--text-muted); margin-top: 6px; background: var(--bg-card2); border-radius: 6px; padding: 8px 12px; }
+
+/* History chart modal */
+.hist-select { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+
+/* MSRP import zone */
+.import-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 30px; text-align: center; color: var(--text-muted); cursor: pointer; transition: all 0.2s; margin: 20px; }
+.import-zone:hover { border-color: var(--blue); color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-logo">
+    <div class="logo-icon">🏎</div>
+    <div>
+      <div class="header-title">MOZA RACING Price Monitor</div>
+      <div class="header-subtitle">US Market Channel Surveillance</div>
+    </div>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="header-badge">Last Crawl: <span id="hdr-last-crawl">Never</span></div>
+  <div class="header-badge">Products: <span id="hdr-products">72</span></div>
+  <button class="btn-crawl" id="btn-crawl-now" onclick="triggerCrawl()">
+    <span id="crawl-icon">▶</span> Run Crawl
+  </button>
+</header>
+
+<!-- Layout -->
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="nav-section-label">Overview</div>
+    <div class="nav-item active" onclick="navigate('dashboard')">
+      <span class="nav-icon">📊</span> Dashboard
+    </div>
+    <div class="nav-section-label">Monitoring</div>
+    <div class="nav-item" onclick="navigate('prices')">
+      <span class="nav-icon">💰</span> Price Monitor
+      <span class="nav-badge" id="nav-anomaly-count">0</span>
+    </div>
+    <div class="nav-item" onclick="navigate('history')">
+      <span class="nav-icon">📈</span> History Trends
+    </div>
+    <div class="nav-section-label">Management</div>
+    <div class="nav-item" onclick="navigate('products')">
+      <span class="nav-icon">📦</span> MSRP Products
+    </div>
+    <div class="nav-item" onclick="navigate('channels')">
+      <span class="nav-icon">🌐</span> Channels
+    </div>
+    <div class="nav-section-label">System</div>
+    <div class="nav-item" onclick="navigate('logs')">
+      <span class="nav-icon">📋</span> Task Logs
+    </div>
+    <div class="nav-item" onclick="navigate('settings')">
+      <span class="nav-icon">⚙️</span> Settings
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ===== DASHBOARD PAGE ===== -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-subtitle">Real-time US market price surveillance for MOZA RACING</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" onclick="exportReport()">⬇ Export Report</button>
+        </div>
+      </div>
+
+      <div id="alert-banner" class="alert-banner">
+        🚨 <strong id="alert-text">Anomalies detected — immediate action required.</strong>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-label">Monitored Channels</div>
+          <div class="stat-value" id="stat-channels">7</div>
+          <div class="stat-sub">Active retail platforms</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Products Tracked</div>
+          <div class="stat-value" id="stat-products">72</div>
+          <div class="stat-sub">MOZA RACING SKUs</div>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-label">Anomalies</div>
+          <div class="stat-value" id="stat-anomalies">—</div>
+          <div class="stat-sub" id="stat-anomaly-sub">Run crawl to detect</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Critical Price Violations</div>
+          <div class="stat-value" id="stat-critical">—</div>
+          <div class="stat-sub" id="stat-critical-sub">Severe MSRP deviation</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Price Status Distribution (Latest Crawl)</div>
+          <div class="chart-wrap" style="height:260px;">
+            <canvas id="chart-status"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Anomaly by Channel</div>
+          <div class="chart-wrap" style="height:260px;">
+            <canvas id="chart-channel"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent anomalies preview -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <div class="card-title">⚠️ Recent Anomalies</div>
+          <button class="btn" onclick="navigate('prices')">View All →</button>
+        </div>
+        <div class="table-wrap">
+          <table id="tbl-recent-anomalies">
+            <thead>
+              <tr>
+                <th>Channel</th><th>Product Name</th><th>MSRP</th><th>Current Price</th><th>Diff</th><th>Status</th><th>Link</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-recent-anomalies">
+              <tr><td colspan="7" class="empty-state"><div class="empty-icon">🔍</div>No crawl data yet. Click "Run Crawl" to start monitoring.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PRICE MONITOR PAGE ===== -->
+    <div class="page" id="page-prices">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Price Monitor</div>
+          <div class="page-subtitle">All channel pricing vs MSRP comparison</div>
+        </div>
+        <button class="btn success" onclick="exportExcel()">📥 Export Excel</button>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <input class="search-input" id="price-search" placeholder="🔍 Search model or channel..." oninput="renderPriceTable()">
+          <select class="filter-select" id="price-status-filter" onchange="renderPriceTable()">
+            <option value="">All Status</option>
+            <option value="Normal">✅ Normal</option>
+            <option value="Price Low">🔻 Price Low</option>
+            <option value="Price High">🔺 Price High</option>
+            <option value="Critical">🚨 Critical</option>
+            <option value="Missing">❌ Missing</option>
+            <option value="Unauthorized">⛔ Unauthorized</option>
+          </select>
+          <select class="filter-select" id="price-channel-filter" onchange="renderPriceTable()">
+            <option value="">All Channels</option>
+          </select>
+          <select class="filter-select" id="price-cat-filter" onchange="renderPriceTable()">
+            <option value="">All Categories</option>
+          </select>
+          <div style="margin-left:auto;color:var(--text-muted);font-size:12px;" id="price-count-label"></div>
+        </div>
+        <div class="table-wrap">
+          <table id="tbl-prices">
+            <thead>
+              <tr>
+                <th onclick="sortPrices('channel')">Channel <span class="sort-arrow">↕</span></th>
+                <th onclick="sortPrices('product_model')">Model <span class="sort-arrow">↕</span></th>
+                <th onclick="sortPrices('msrp')">MSRP <span class="sort-arrow">↕</span></th>
+                <th onclick="sortPrices('listing_price')">Current Price <span class="sort-arrow">↕</span></th>
+                <th onclick="sortPrices('price_diff')">Diff $ <span class="sort-arrow">↕</span></th>
+                <th onclick="sortPrices('price_diff_pct')">Diff % <span class="sort-arrow">↕</span></th>
+                <th onclick="sortPrices('status')">Status <span class="sort-arrow">↕</span></th>
+                <th>Link</th>
+                <th onclick="sortPrices('crawl_time')">Crawl Time <span class="sort-arrow">↕</span></th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-prices">
+              <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📡</div>No price data yet.<br>Click "Run Crawl" in the header to start.</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="price-pagination"></div>
+      </div>
+    </div>
+
+    <!-- ===== HISTORY TRENDS PAGE ===== -->
+    <div class="page" id="page-history">
+      <div class="page-header">
+        <div>
+          <div class="page-title">History Trends</div>
+          <div class="page-subtitle">Price change analysis over time</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+          <div class="card-title">Price Trend Chart</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select class="filter-select" id="hist-model" onchange="renderHistory()">
+              <option value="">Select a model...</option>
+            </select>
+            <select class="filter-select" id="hist-channel" onchange="renderHistory()">
+              <option value="">All Channels</option>
+            </select>
+            <select class="filter-select" id="hist-days" onchange="renderHistory()">
+              <option value="7">Last 7 days</option>
+              <option value="14">Last 14 days</option>
+              <option value="30" selected>Last 30 days</option>
+            </select>
+          </div>
+        </div>
+        <div style="padding:20px;">
+          <div class="chart-wrap" style="height:340px;">
+            <canvas id="chart-history"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PRODUCTS PAGE ===== -->
+    <div class="page" id="page-products">
+      <div class="page-header">
+        <div>
+          <div class="page-title">MSRP Products</div>
+          <div class="page-subtitle">Official MOZA RACING product catalog &amp; MSRP prices</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" onclick="openImportModal()">📂 Import Excel</button>
+          <button class="btn primary" onclick="openAddProductModal()">+ Add Product</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <input class="search-input" id="prod-search" placeholder="🔍 Search model or name..." oninput="renderProductTable()">
+          <select class="filter-select" id="prod-cat-filter" onchange="renderProductTable()">
+            <option value="">All Categories</option>
+          </select>
+          <div style="margin-left:auto;color:var(--text-muted);font-size:12px;" id="prod-count-label"></div>
+        </div>
+        <div class="table-wrap">
+          <table id="tbl-products">
+            <thead>
+              <tr>
+                <th onclick="sortProducts('catalog')">Category <span class="sort-arrow">↕</span></th>
+                <th onclick="sortProducts('code')">Model Code <span class="sort-arrow">↕</span></th>
+                <th onclick="sortProducts('name')">Product Name <span class="sort-arrow">↕</span></th>
+                <th onclick="sortProducts('msrp')">MSRP (USD) <span class="sort-arrow">↕</span></th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-products"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="prod-pagination"></div>
+      </div>
+    </div>
+
+    <!-- ===== CHANNELS PAGE ===== -->
+    <div class="page" id="page-channels">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Channel Management</div>
+          <div class="page-subtitle">Configure monitored US retail platforms</div>
+        </div>
+        <button class="btn primary" onclick="openAddChannelModal()">+ Add Channel</button>
+      </div>
+      <div class="card">
+        <div class="channel-grid" id="channel-grid"></div>
+      </div>
+    </div>
+
+    <!-- ===== LOGS PAGE ===== -->
+    <div class="page" id="page-logs">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Task Logs</div>
+          <div class="page-subtitle">Crawl execution history and status</div>
+        </div>
+        <button class="btn danger" onclick="clearLogs()">🗑 Clear Logs</button>
+      </div>
+      <div class="card">
+        <div id="log-list"></div>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS PAGE ===== -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Settings</div>
+          <div class="page-subtitle">Configure crawl schedule and thresholds</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><div class="card-title">⏰ Auto Crawl Schedule</div></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Crawl Time (ET)</label>
+            <input class="form-input" id="setting-crawl-time" type="time" value="08:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Timezone</label>
+            <select class="form-input" id="setting-tz">
+              <option value="ET">US Eastern Time (ET)</option>
+              <option value="UTC">UTC</option>
+              <option value="PT">US Pacific Time (PT)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Retry on Failure</label>
+            <select class="form-input" id="setting-retry">
+              <option value="3">3 times</option>
+              <option value="5">5 times</option>
+              <option value="1">1 time</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Request Delay (seconds)</label>
+            <input class="form-input" id="setting-delay" type="number" value="2" min="1" max="10">
+          </div>
+        </div>
+        <div class="form-actions"><button class="btn primary" onclick="saveSettings()">💾 Save Settings</button></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">🎯 Anomaly Detection Thresholds</div></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Low Price Threshold (%)</label>
+            <input class="form-input" id="thresh-low" type="number" value="5" min="1" max="50">
+            <small style="color:var(--text-muted);font-size:11px;">Flag if price is X% below MSRP</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">High Price Threshold (%)</label>
+            <input class="form-input" id="thresh-high" type="number" value="10" min="1" max="100">
+            <small style="color:var(--text-muted);font-size:11px;">Flag if price is X% above MSRP</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Critical Threshold (%)</label>
+            <input class="form-input" id="thresh-critical" type="number" value="20" min="5" max="100">
+            <small style="color:var(--text-muted);font-size:11px;">Flag as critical if deviation exceeds X%</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Auto-export Daily Report</label>
+            <select class="form-input" id="setting-auto-export">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions"><button class="btn primary" onclick="saveThresholds()">💾 Save Thresholds</button></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ===== MODALS ===== -->
+<!-- Add/Edit Product Modal -->
+<div class="modal-overlay" id="modal-product">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-product-title">Add Product</div>
+      <button class="modal-close" onclick="closeModal('modal-product')">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Model Code *</label>
+        <input class="form-input" id="p-code" placeholder="e.g. RS080">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category *</label>
+        <select class="form-input" id="p-cat">
+          <option>Bundle</option><option>Wheel Base</option><option>Steering Wheel</option>
+          <option>Pedal</option><option>Accessory</option><option>Base</option>
+          <option>Grip</option><option>Throttle</option><option>Rudder</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Product Name *</label>
+        <input class="form-input" id="p-name" placeholder="e.g. MOZA R9 V3 Direct Drive Wheel Base">
+      </div>
+      <div class="form-group">
+        <label class="form-label">MSRP (USD) *</label>
+        <input class="form-input" id="p-msrp" type="number" step="0.01" placeholder="329.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-input" id="p-status">
+          <option value="Active">Active</option>
+          <option value="Discontinued">Discontinued</option>
+          <option value="Coming Soon">Coming Soon</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('modal-product')">Cancel</button>
+      <button class="btn primary" onclick="saveProduct()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Channel Modal -->
+<div class="modal-overlay" id="modal-channel">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-channel-title">Add Channel</div>
+      <button class="modal-close" onclick="closeModal('modal-channel')">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Channel Name *</label>
+        <input class="form-input" id="ch-name" placeholder="e.g. Amazon US">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-input" id="ch-type">
+          <option>Official</option><option>Authorized</option><option>Third-party</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Base URL *</label>
+        <input class="form-input" id="ch-url" placeholder="https://www.amazon.com">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Product Listing URL</label>
+        <input class="form-input" id="ch-listing-url" placeholder="https://www.amazon.com/s?k=moza+racing">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Crawl Frequency</label>
+        <select class="form-input" id="ch-freq">
+          <option value="daily">Daily</option>
+          <option value="twice">Twice Daily</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-input" id="ch-status">
+          <option value="Active">Active</option>
+          <option value="Paused">Paused</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('modal-channel')">Cancel</button>
+      <button class="btn primary" onclick="saveChannel()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- History Chart Modal -->
+<div class="modal-overlay" id="modal-history">
+  <div class="modal" style="width:720px;">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-hist-title">Price History</div>
+      <button class="modal-close" onclick="closeModal('modal-history')">×</button>
+    </div>
+    <div style="padding:20px;">
+      <div class="chart-wrap" style="height:320px;"><canvas id="chart-modal-hist"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// =====================================================
+// API BASE — 连接后端，或降级到纯前端模拟模式
+// =====================================================
+const API_BASE = (() => {
+  // 如果是从文件直接打开（file://），使用模拟模式
+  if (location.protocol === 'file:') return null;
+  // 否则指向 Flask 后端
+  return location.origin;
+})();
+
+async function apiFetch(path, opts = {}) {
+  if (!API_BASE) return null; // 模拟模式时跳过
+  try {
+    const res = await fetch(API_BASE + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.warn('[API]', path, e.message);
+    return null;
+  }
+}
+
+// =====================================================
+// DATA STORE (兼容模拟模式)
+// =====================================================
+const STORE_KEY = 'moza_pm_v2';
+
+// Load persisted data
+function loadStore() {
+  try {
+    const s = localStorage.getItem(STORE_KEY);
+    return s ? JSON.parse(s) : null;
+  } catch(e) { return null; }
+}
+function saveStore() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } catch(e) {}
+}
+
+// =====================================================
+// INITIAL DATA SEED
+// =====================================================
+const DEFAULT_PRODUCTS = [
+  {code:'AS017',name:'MOZA AB6 Flight Simulator',catalog:'Bundle',msrp:399,status:'Active'},
+  {code:'AS001',name:'MOZA AB9 Force Feedback base',catalog:'Base',msrp:499,status:'Active'},
+  {code:'AS011',name:'MOZA AY210 Force Feedback YOKE',catalog:'Base',msrp:699,status:'Active'},
+  {code:'AS018',name:'MOZA MHG Flight Stick',catalog:'Grip',msrp:99,status:'Active'},
+  {code:'AS002',name:'MOZA MH16 Flightstick',catalog:'Grip',msrp:149,status:'Active'},
+  {code:'AS005',name:'MOZA MA3X Sidestick',catalog:'Grip',msrp:79,status:'Active'},
+  {code:'AS012',name:'MOZA MFY YOKE',catalog:'Grip',msrp:149,status:'Active'},
+  {code:'AS008',name:'MOZA MTP Throttle Panel',catalog:'Throttle',msrp:329,status:'Active'},
+  {code:'AS014',name:'MOZA MTQ Throttle Panel',catalog:'Throttle',msrp:199,status:'Active'},
+  {code:'AS009',name:'MOZA MTLP Take-off Landing Panel',catalog:'Throttle',msrp:149,status:'Active'},
+  {code:'AS019',name:'MOZA MRP Rudder Pedals',catalog:'Rudder',msrp:349,status:'Active'},
+  {code:'AS003',name:'MOZA Z-Axis Module',catalog:'Accessory',msrp:89,status:'Active'},
+  {code:'AS004',name:'MOZA Flight Base Table Clamp',catalog:'Accessory',msrp:59,status:'Active'},
+  {code:'AS013',name:'MOZA Table Clamp For Yoke',catalog:'Accessory',msrp:25,status:'Active'},
+  {code:'AS006',name:'MOZA Flight Support Plate',catalog:'Accessory',msrp:25,status:'Active'},
+  {code:'AS015',name:'MOZA TQB Throttle Module',catalog:'Accessory',msrp:39,status:'Active'},
+  {code:'AS016',name:'MOZA TQA Throttle Module',catalog:'Accessory',msrp:39,status:'Active'},
+  {code:'AS020',name:'MOZA MRP Adjustable Damper',catalog:'Accessory',msrp:65,status:'Active'},
+  {code:'RS053',name:'MOZA R3 Racing Wheel and Pedals',catalog:'Bundle',msrp:339,status:'Active'},
+  {code:'RS074',name:'MOZA R3 Racing Wheel and Pedals for PC',catalog:'Bundle',msrp:279,status:'Active'},
+  {code:'RS20',name:'MOZA R5 Racing Simulator',catalog:'Bundle',msrp:399,status:'Active'},
+  {code:'RS071',name:'MOZA Truck Driving Simulator',catalog:'Bundle',msrp:499,status:'Active'},
+  {code:'RS080',name:'MOZA R9 V3 Direct Drive Wheel Base',catalog:'Wheel Base',msrp:329,status:'Active'},
+  {code:'RS081',name:'MOZA R12 V2 Direct Drive Wheel Base',catalog:'Wheel Base',msrp:429,status:'Active'},
+  {code:'RS090',name:'MOZA R21 Ultra Direct Drive Wheel Base',catalog:'Wheel Base',msrp:699,status:'Active'},
+  {code:'RS091',name:'MOZA R25 Ultra True Torque DD Wheel Base',catalog:'Wheel Base',msrp:899,status:'Active'},
+  {code:'RS052',name:'MOZA ESX Steering Wheel For XBOX',catalog:'Steering Wheel',msrp:129,status:'Active'},
+  {code:'RS057',name:'MOZA CS V2P Steering Wheel',catalog:'Steering Wheel',msrp:229,status:'Active'},
+  {code:'RS093',name:'MOZA CS Pro Steering Wheel',catalog:'Steering Wheel',msrp:329,status:'Active'},
+  {code:'RS25',name:'MOZA RS V2 Steering Wheel',catalog:'Steering Wheel',msrp:369,status:'Active'},
+  {code:'RS047',name:'MOZA KS Steering Wheel',catalog:'Steering Wheel',msrp:229,status:'Active'},
+  {code:'RS095',name:'MOZA KS Pro Steering Wheel',catalog:'Steering Wheel',msrp:329,status:'Active'},
+  {code:'RS056',name:'MOZA GS V2P Formula Wheel',catalog:'Steering Wheel',msrp:369,status:'Active'},
+  {code:'RS068',name:'MOZA FSR V2 Formula Wheel',catalog:'Steering Wheel',msrp:649,status:'Active'},
+  {code:'RS064',name:'MOZA Vision GS Steering Wheel',catalog:'Steering Wheel',msrp:699,status:'Active'},
+  {code:'RS060',name:'MOZA TSW Steering Wheel',catalog:'Steering Wheel',msrp:229,status:'Active'},
+  {code:'RS096',name:'MOZA Lamborghini REVUELTO Simracing Steering Wheel',catalog:'Steering Wheel',msrp:399,status:'Active'},
+  {code:'RS070',name:'MOZA Lamborghini Essenza SCV12 Sim-Racing Steering Wheel',catalog:'Steering Wheel',msrp:1299,status:'Active'},
+  {code:'RS097',name:'MOZA Porsche MISSION R Simracing Steering Wheel',catalog:'Steering Wheel',msrp:1299,status:'Active'},
+  {code:'RS11',name:'MOZA SR-P Pedals',catalog:'Pedal',msrp:129,status:'Active'},
+  {code:'RS098',name:'MOZA SR-P 2 Pedals',catalog:'Pedal',msrp:149,status:'Active'},
+  {code:'RS066',name:'MOZA CRP2 Pedals',catalog:'Pedal',msrp:369,status:'Active'},
+  {code:'RS076',name:'MOZA mBooster Active Pedal',catalog:'Pedal',msrp:799,status:'Active'},
+  {code:'RS082',name:'MOZA mBooster Pedal Set',catalog:'Pedal',msrp:999,status:'Active'},
+  {code:'RS19',name:'MOZA SR-P Lite Clutch Pedal',catalog:'Pedal',msrp:39.9,status:'Active'},
+  {code:'RS111',name:'MOZA SR-P Clutch Pedal',catalog:'Pedal',msrp:45.9,status:'Active'},
+  {code:'RS099',name:'MOZA SR-P 2 Clutch Pedal',catalog:'Pedal',msrp:45.9,status:'Active'},
+  {code:'RS067',name:'MOZA CRP2 Clutch Pedal',catalog:'Pedal',msrp:99,status:'Active'},
+  {code:'RS072',name:'MOZA CM2 Racing Dash',catalog:'Accessory',msrp:199,status:'Active'},
+  {code:'RS063',name:'MOZA E-Stop Switch',catalog:'Accessory',msrp:35,status:'Active'},
+  {code:'RS31',name:'MOZA HBP Handbrake',catalog:'Accessory',msrp:99,status:'Active'},
+  {code:'RS039',name:'MOZA HGP Shifter',catalog:'Accessory',msrp:149,status:'Active'},
+  {code:'RS059',name:'MOZA SGP Sequential Shifter',catalog:'Accessory',msrp:129,status:'Active'},
+  {code:'RS089',name:'MOZA Universal Mounting Plate',catalog:'Accessory',msrp:29,status:'Active'},
+  {code:'RS079',name:'MOZA Active Shifter Knobs',catalog:'Accessory',msrp:39,status:'Active'},
+  {code:'RS12',name:'MOZA Table Clamp',catalog:'Accessory',msrp:39,status:'Active'},
+  {code:'RS062',name:'MOZA Clamp For Truck Wheel',catalog:'Accessory',msrp:49,status:'Active'},
+  {code:'RS061',name:'MOZA Extension Rod',catalog:'Accessory',msrp:99,status:'Active'},
+  {code:'RS07',name:'MOZA Quick Release Adapter',catalog:'Accessory',msrp:49,status:'Active'},
+  {code:'RS032',name:'MOZA ES Formula Wheel Mod',catalog:'Accessory',msrp:39,status:'Active'},
+  {code:'RS046',name:'MOZA 12-inch Wheel Mod for ES',catalog:'Accessory',msrp:69,status:'Active'},
+  {code:'RS094',name:'MOZA Paddles Add-on Kit',catalog:'Accessory',msrp:45,status:'Active'},
+  {code:'RS050',name:'MOZA Universal Hub Kit',catalog:'Accessory',msrp:39,status:'Active'},
+  {code:'RS065',name:'MOZA Multi-function Stalks',catalog:'Accessory',msrp:199,status:'Active'},
+  {code:'RS077',name:'MOZA Multi-function Stalks Mount Adapter',catalog:'Accessory',msrp:19,status:'Active'},
+  {code:'RS22',name:'MOZA SR-P Lite Performance Kit',catalog:'Accessory',msrp:29,status:'Active'},
+  {code:'RS17',name:'MOZA SR-P Accessory Kit',catalog:'Accessory',msrp:15,status:'Active'},
+  {code:'RS069',name:'MOZA CRP2 Performance Kit',catalog:'Accessory',msrp:19.9,status:'Active'},
+  {code:'RS075',name:'MOZA Pedals Inversion Kit',catalog:'Accessory',msrp:179,status:'Active'},
+  {code:'RS073',name:'MOZA Long Throttle Plate',catalog:'Accessory',msrp:29,status:'Active'},
+  {code:'RS083',name:'MOZA mBooster Base Plate',catalog:'Accessory',msrp:129,status:'Active'},
+  {code:'RS078',name:'MOZA mBooster Base Extension Plate',catalog:'Accessory',msrp:39,status:'Active'},
+];
+
+const DEFAULT_CHANNELS = [
+  {id:1,name:'Amazon US',url:'https://www.amazon.com',listingUrl:'https://www.amazon.com/s?k=moza+racing',type:'Third-party',freq:'daily',status:'Active',note:'Primary market'},
+  {id:2,name:'Best Buy',url:'https://www.bestbuy.com',listingUrl:'https://www.bestbuy.com/site/searchpage.jsp?st=moza+racing',type:'Authorized',freq:'daily',status:'Active',note:''},
+  {id:3,name:'B&H Photo',url:'https://www.bhphotovideo.com',listingUrl:'https://www.bhphotovideo.com/c/search?q=moza+racing',type:'Authorized',freq:'daily',status:'Active',note:''},
+  {id:4,name:'Newegg',url:'https://www.newegg.com',listingUrl:'https://www.newegg.com/p/pl?d=moza+racing',type:'Third-party',freq:'daily',status:'Active',note:''},
+  {id:5,name:'Adorama',url:'https://www.adorama.com',listingUrl:'https://www.adorama.com/l/?searchinfo=moza+racing',type:'Authorized',freq:'daily',status:'Active',note:''},
+  {id:6,name:'MOZA Official',url:'https://mozaracing.com',listingUrl:'https://mozaracing.com/collections/all',type:'Official',freq:'daily',status:'Active',note:''},
+  {id:7,name:'Walmart',url:'https://www.walmart.com',listingUrl:'https://www.walmart.com/search?q=moza+racing',type:'Third-party',freq:'daily',status:'Active',note:''},
+];
+
+const stored = loadStore();
+const DB = stored || {
+  products: DEFAULT_PRODUCTS,
+  channels: DEFAULT_CHANNELS,
+  prices: [],       // live crawl results
+  history: [],      // historical data points
+  logs: [],
+  settings: { crawlTime:'08:00', tz:'ET', retry:3, delay:2, threshLow:5, threshHigh:10, threshCritical:20, autoExport:'yes' },
+  lastCrawlTime: null,
+  nextId: 100
+};
+
+if (!stored) saveStore();
+
+// =====================================================
+// NAVIGATION
+// =====================================================
+let currentPage = 'dashboard';
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + page + "'")) {
+      n.classList.add('active');
+    }
+  });
+  currentPage = page;
+  // Render page-specific content
+  const renders = {
+    dashboard: renderDashboard,
+    prices: renderPriceTable,
+    history: renderHistoryPage,
+    products: renderProductTable,
+    channels: renderChannels,
+    logs: renderLogs,
+    settings: renderSettings
+  };
+  if (renders[page]) renders[page]();
+}
+
+// =====================================================
+// CRAWL — 真实后端 or 模拟模式
+// =====================================================
+let crawlInProgress = false;
+let crawlPollInterval = null;
+
+async function triggerCrawl() {
+  if (crawlInProgress) return;
+
+  const btn = document.getElementById('btn-crawl-now');
+  btn.classList.add('loading');
+  btn.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> Crawling...';
+  crawlInProgress = true;
+
+  if (API_BASE) {
+    // ── 真实后端模式 ──────────────────────────────────
+    const res = await apiFetch('/api/crawl', { method: 'POST' });
+    if (!res) {
+      toast('❌ Failed to start crawl. Is the server running?', 'error');
+      _resetCrawlBtn(); return;
+    }
+    toast(`🚀 Crawl started (Task #${res.task_id}) — fetching all channels...`, 'success');
+    if (currentPage === 'logs') renderLogs();
+
+    // 轮询任务状态，最多 5 分钟
+    let elapsed = 0;
+    crawlPollInterval = setInterval(async () => {
+      elapsed += 3;
+      const status = await apiFetch('/api/crawl/status');
+      if (!status) return;
+      if (!status.running) {
+        clearInterval(crawlPollInterval);
+        const task = status.last_task;
+        if (task) {
+          const anomalies = task.anomalies || 0;
+          const critical = 0;
+          document.getElementById('nav-anomaly-count').textContent = anomalies;
+          updateAlertBanner(anomalies, critical);
+          toast(`✅ Crawl complete! ${task.products} listings, ${anomalies} anomalies.`, 'success');
+          DB.lastCrawlTime = task.end_time;
+          document.getElementById('hdr-last-crawl').textContent = formatTime(new Date(task.end_time));
+        }
+        _resetCrawlBtn();
+        if (currentPage === 'dashboard') renderDashboard();
+        if (currentPage === 'prices') renderPriceTable();
+        if (currentPage === 'logs') renderLogs();
+      }
+      if (elapsed > 300) {
+        clearInterval(crawlPollInterval);
+        _resetCrawlBtn();
+        toast('⚠️ Crawl is taking too long. Check logs for status.', 'warning');
+      }
+    }, 3000);
+
+  } else {
+    // ── 模拟模式（file:// 直接打开）────────────────────
+    const logId = DB.nextId++;
+    const startTime = new Date();
+    DB.logs.unshift({ id: logId, status: 'running', title: 'Simulated Crawl — ' + formatDate(startTime),
+      startTime: startTime.toISOString(), endTime: null, products: 0, channels: 0,
+      anomalies: 0, errors: [], details: 'Simulating crawl (offline mode)...' });
+    saveStore();
+    if (currentPage === 'logs') renderLogs();
+    toast('🚀 Crawl started (Simulation Mode)...', 'success');
+
+    let step = 0;
+    const activeChannels = DB.channels.filter(c => c.status === 'Active');
+    const interval = setInterval(() => {
+      step++;
+      if (step <= activeChannels.length) {
+        toast(`📡 Simulating ${activeChannels[step-1].name}... (${step}/${activeChannels.length})`, 'success');
+      }
+      if (step >= activeChannels.length + 1) {
+        clearInterval(interval);
+        _finalizeMockCrawl(logId, startTime);
+      }
+    }, 600);
+  }
+}
+
+function _resetCrawlBtn() {
+  crawlInProgress = false;
+  const btn = document.getElementById('btn-crawl-now');
+  btn.classList.remove('loading');
+  btn.innerHTML = '<span>▶</span> Run Crawl';
+}
+
+function _finalizeMockCrawl(logId, startTime) {
+  const results = _generateMockPriceData();
+  DB.prices = results;
+  const today = new Date().toISOString().split('T')[0];
+  results.forEach(r => DB.history.push({...r, date: today}));
+  const anomalies = results.filter(r => r.status !== 'Normal').length;
+  const critical = results.filter(r => r.status === 'Critical').length;
+  const endTime = new Date();
+  const idx = DB.logs.findIndex(l => l.id === logId);
+  if (idx >= 0) {
+    DB.logs[idx] = { ...DB.logs[idx], status:'success', endTime: endTime.toISOString(),
+      products: results.length, channels: DB.channels.filter(c=>c.status==='Active').length,
+      anomalies, details: `Simulated ${results.length} listings. ${anomalies} anomalies.` };
+  }
+  DB.lastCrawlTime = endTime.toISOString();
+  saveStore();
+  _resetCrawlBtn();
+  document.getElementById('hdr-last-crawl').textContent = formatTime(endTime);
+  document.getElementById('nav-anomaly-count').textContent = anomalies;
+  updateAlertBanner(anomalies, critical);
+  toast(`✅ Simulation done! ${results.length} listings. ${anomalies} anomalies.`, 'success');
+  if (currentPage === 'dashboard') renderDashboard();
+  if (currentPage === 'prices') renderPriceTable();
+  if (currentPage === 'logs') renderLogs();
+}
+
+function _generateMockPriceData() {
+  const results = [];
+  const activeChannels = DB.channels.filter(c => c.status === 'Active');
+  const activeProducts = DB.products.filter(p => p.status === 'Active');
+  const now = new Date().toISOString();
+  const threshLow = (DB.settings.threshLow || 5) / 100;
+  const threshCrit = (DB.settings.threshCritical || 20) / 100;
+  activeChannels.forEach(ch => {
+    const shuffled = [...activeProducts].sort(() => Math.random()-0.5);
+    shuffled.slice(0, Math.floor(shuffled.length * (0.55 + Math.random() * 0.3))).forEach(prod => {
+      const variance = (Math.random() - 0.45) * 0.35;
+      const listing_price = parseFloat((prod.msrp * (1 + variance)).toFixed(2));
+      const price_diff = parseFloat((listing_price - prod.msrp).toFixed(2));
+      const price_diff_pct = parseFloat((price_diff / prod.msrp * 100).toFixed(1));
+      let status = 'Normal';
+      const absDiff = Math.abs(price_diff / prod.msrp);
+      if (absDiff > threshCrit) status = 'Critical';
+      else if (price_diff < -prod.msrp * threshLow) status = 'Low';
+      else if (price_diff > prod.msrp * (DB.settings.threshHigh||10) / 100) status = 'High';
+      if (ch.type === 'Third-party' && Math.random() < 0.04) status = 'Unauthorized';
+      const slug = prod.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const urlMap = {
+        'Amazon US': `https://www.amazon.com/dp/B0${Math.random().toString(36).slice(2,11).toUpperCase()}`,
+        'Best Buy': `https://www.bestbuy.com/site/${slug}/123.p`,
+        'B&H Photo': `https://www.bhphotovideo.com/c/product/1/${slug}.html`,
+        'Newegg': `https://www.newegg.com/p/${prod.code}`,
+        'Adorama': `https://www.adorama.com/${prod.code.toLowerCase()}.html`,
+        'MOZA Official': `https://mozaracing.com/products/${slug}`,
+        'Walmart': `https://www.walmart.com/ip/${slug}/1`
+      };
+      results.push({ id: DB.nextId++, channel: ch.name,
+        product_code: prod.code, product_model: prod.code, product_name: prod.name,
+        catalog: prod.catalog, msrp: prod.msrp, listing_price, price_diff,
+        diff_pct: price_diff_pct, price_diff_pct, status,
+        product_url: urlMap[ch.name] || '#', crawl_time: now });
+    });
+  });
+  return results;
+}
+
+// =====================================================
+// DASHBOARD RENDER
+// =====================================================
+async function renderDashboard() {
+  if (API_BASE) {
+    // ── 真实后端模式 ──────────────────────────────────
+    const data = await apiFetch('/api/dashboard');
+    if (!data) { toast('Cannot connect to backend server', 'error'); return; }
+
+    document.getElementById('stat-channels').textContent = data.total_channels;
+    document.getElementById('stat-products').textContent = data.total_products;
+    document.getElementById('hdr-products').textContent = data.total_products;
+    document.getElementById('stat-anomalies').textContent = data.anomalies;
+    const total = data.normal + data.anomalies + data.missing;
+    document.getElementById('stat-anomaly-sub').textContent =
+      total > 0 ? `${((data.anomalies / total) * 100).toFixed(0)}% of monitored listings` : '—';
+    document.getElementById('stat-critical').textContent = data.critical;
+    document.getElementById('stat-critical-sub').textContent =
+      data.critical > 0 ? 'Requires immediate action' : 'No critical violations';
+    document.getElementById('nav-anomaly-count').textContent = data.anomalies;
+    updateAlertBanner(data.anomalies, data.critical);
+    if (data.last_crawl) {
+      document.getElementById('hdr-last-crawl').textContent = formatTime(new Date(data.last_crawl));
+    }
+
+    // 渲染图表（使用后端数据）
+    _renderStatusChartData({
+      Normal: data.normal, Low: 0, High: 0, Critical: data.critical,
+      Missing: data.missing, Unauthorized: 0
+    });
+    _renderChannelChartData(data.channel_anomalies);
+    _renderRecentAnomaliesData(data.recent_anomalies);
+
+  } else {
+    // ── 模拟模式 ────────────────────────────────────────
+    const anomalies = DB.prices.filter(p => p.status !== 'Normal').length;
+    const critical = DB.prices.filter(p => p.status === 'Critical').length;
+    document.getElementById('stat-channels').textContent = DB.channels.filter(c=>c.status==='Active').length;
+    document.getElementById('stat-products').textContent = DB.products.filter(p=>p.status==='Active').length;
+    document.getElementById('hdr-products').textContent = DB.products.filter(p=>p.status==='Active').length;
+    if (DB.prices.length > 0) {
+      document.getElementById('stat-anomalies').textContent = anomalies;
+      document.getElementById('stat-anomaly-sub').textContent = `${((anomalies/DB.prices.length)*100).toFixed(0)}% of monitored listings`;
+      document.getElementById('stat-critical').textContent = critical;
+      document.getElementById('stat-critical-sub').textContent = critical > 0 ? 'Requires immediate action' : 'No critical violations';
+      document.getElementById('nav-anomaly-count').textContent = anomalies;
+      updateAlertBanner(anomalies, critical);
+    }
+    if (DB.lastCrawlTime) document.getElementById('hdr-last-crawl').textContent = formatTime(new Date(DB.lastCrawlTime));
+
+    const statusCounts = {};
+    DB.prices.forEach(p => { statusCounts[p.status] = (statusCounts[p.status]||0)+1; });
+    _renderStatusChartData(statusCounts);
+
+    const chAnomalies = {};
+    DB.prices.filter(p=>p.status!=='Normal').forEach(p => { chAnomalies[p.channel] = (chAnomalies[p.channel]||0)+1; });
+    _renderChannelChartData(Object.entries(chAnomalies).map(([channel,cnt])=>({channel,cnt})));
+    _renderRecentAnomaliesData(DB.prices.filter(p=>p.status!=='Normal').slice(0,10).map(r => ({
+      ...r, diff_pct: r.diff_pct ?? r.price_diff_pct
+    })));
+  }
+}
+
+function _renderStatusChartData(statusCounts) {
+  const ctx = document.getElementById('chart-status');
+  if (!ctx) return;
+  const statuses = ['Normal','Low','High','Critical','Unauthorized','Missing'];
+  const colors   = ['#2dc653','#f4a261','#4895ef','#e63946','#ff5000','#9b72cf'];
+  const counts = statuses.map(s => statusCounts[s] || 0);
+  if (window._chartStatus) window._chartStatus.destroy();
+  window._chartStatus = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: statuses, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, borderColor: '#1a1d27' }] },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{position:'right',labels:{color:'#8892a4',padding:12,font:{size:12}}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} listings`}} } }
+  });
+}
+
+function _renderChannelChartData(channelData) {
+  const ctx = document.getElementById('chart-channel');
+  if (!ctx) return;
+  const labels = channelData.map(d => d.channel.replace(' US','').replace(' Photo',''));
+  const counts  = channelData.map(d => d.cnt);
+  if (window._chartChannel) window._chartChannel.destroy();
+  window._chartChannel = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label:'Anomalies', data:counts, backgroundColor:'#e63946', borderRadius:4 }] },
+    options: { responsive:true, maintainAspectRatio:false,
+      scales: { x:{grid:{color:'#2d3148'},ticks:{color:'#8892a4'}}, y:{grid:{color:'#2d3148'},ticks:{color:'#8892a4'}} },
+      plugins:{legend:{labels:{color:'#8892a4'}}} }
+  });
+}
+
+function _renderRecentAnomaliesData(anomalies) {
+  const tbody = document.getElementById('tbody-recent-anomalies');
+  if (!anomalies || anomalies.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🎉</div>No anomalies detected in latest crawl!</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = anomalies.slice(0,10).map(r => {
+    const lp = r.listing_price ?? r.price;
+    const pd = r.price_diff ?? (lp - r.msrp);
+    const pct = r.diff_pct ?? r.price_diff_pct ?? 0;
+    return `<tr>
+      <td>${r.channel}</td>
+      <td><strong>${r.product_name}</strong></td>
+      <td class="price">$${(+r.msrp).toFixed(2)}</td>
+      <td class="price ${pd < 0 ? 'price-low' : Math.abs(pct) > 20 ? 'price-critical' : 'price-high'}">$${lp != null ? (+lp).toFixed(2) : 'N/A'}</td>
+      <td class="${pd < 0 ? 'diff-neg' : 'diff-pos'}">$${pd != null ? (pd > 0 ? '+' : '') + (+pd).toFixed(2) : 'N/A'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${r.product_url ? `<a href="${r.product_url}" target="_blank" class="link-icon">↗</a>` : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateAlertBanner(anomalies, critical) {
+  const banner = document.getElementById('alert-banner');
+  if (anomalies === 0) { banner.classList.add('hidden'); return; }
+  banner.classList.remove('hidden');
+  document.getElementById('alert-text').textContent =
+    `🚨 ${anomalies} pricing anomalies detected (${critical} critical) — Review required`;
+}
+
+function renderStatusChart() { /* 兼容旧调用，转发到新函数 */ }
+function renderChannelChart() { /* 兼容旧调用，转发到新函数 */ }
+function renderRecentAnomalies() { /* 兼容旧调用，转发到新函数 */ }
+
+// =====================================================
+// PRICE TABLE — 真实 API + 分页
+// =====================================================
+let priceSortField = 'status', priceSortAsc = true, pricePage = 1;
+const PRICE_PAGE_SIZE = 25;
+let _priceTotal = 0, _pricePages = 0;
+
+async function renderPriceTable() {
+  if (API_BASE) {
+    const search   = document.getElementById('price-search').value.trim();
+    const statusF  = document.getElementById('price-status-filter').value;
+    const channelF = document.getElementById('price-channel-filter').value;
+    const catF     = document.getElementById('price-cat-filter').value;
+
+    const params = new URLSearchParams({ page: pricePage, page_size: PRICE_PAGE_SIZE });
+    if (search)   params.set('q', search);
+    if (statusF)  params.set('status', statusF);
+    if (channelF) params.set('channel', channelF);
+    if (catF)     params.set('catalog', catF);
+
+    const data = await apiFetch('/api/prices?' + params.toString());
+    if (!data) { toast('Cannot load price data', 'error'); return; }
+
+    _priceTotal = data.total;
+    _pricePages = data.pages;
+    document.getElementById('price-count-label').textContent = `${data.total} listings`;
+
+    const slice = data.data;
+    const tbody = document.getElementById('tbody-prices');
+    if (slice.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">🔍</div>' +
+        (data.total === 0 ? 'No crawl data yet. Run a crawl to populate.' : 'No results match your filters.') +
+        '</div></td></tr>';
+    } else {
+      tbody.innerHTML = slice.map(r => {
+        const lp  = r.listing_price;
+        const pd  = r.price_diff;
+        const pct = r.diff_pct;
+        const diffClass  = pd < 0 ? 'diff-neg' : pd > 0 ? 'diff-pos' : '';
+        const priceClass = r.status === 'Critical' ? 'price-critical' : pd < 0 ? 'price-low' : pd > 0 ? 'price-high' : '';
+        return `<tr>
+          <td>${r.channel}</td>
+          <td><strong>${r.product_code}</strong><br><small style="color:var(--text-muted)">${(r.product_name||'').substring(0,35)}${r.product_name?.length>35?'...':''}</small></td>
+          <td class="price">$${(+r.msrp).toFixed(2)}</td>
+          <td class="price ${priceClass}">${lp != null ? '$' + (+lp).toFixed(2) : '<span style="color:var(--text-muted)">N/A</span>'}</td>
+          <td class="${diffClass}">${pd != null ? (pd > 0 ? '+$' : '-$') + Math.abs(+pd).toFixed(2) : '—'}</td>
+          <td class="${diffClass}">${pct != null ? (pct > 0 ? '+' : '') + (+pct).toFixed(1) + '%' : '—'}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td>${r.product_url ? `<a href="${r.product_url}" target="_blank" class="link-icon">↗</a>` : '—'}</td>
+          <td style="color:var(--text-muted);font-size:11px;">${r.crawl_time ? formatTime(new Date(r.crawl_time)) : ''}</td>
+          <td><button class="btn" style="padding:4px 8px;font-size:11px;" onclick="showHistory('${r.product_code}','${r.channel}')">📈</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // 填充渠道/分类筛选器（只填一次）
+    _populatePriceFilters(slice);
+    renderPagination('price-pagination', pricePage, _pricePages, p => { pricePage = p; renderPriceTable(); });
+
+  } else {
+    // 模拟模式（原逻辑）
+    _renderPriceTableLocal();
+  }
+}
+
+function _populatePriceFilters(rows) {
+  const channelSel = document.getElementById('price-channel-filter');
+  const catSel = document.getElementById('price-cat-filter');
+  if (channelSel.options.length <= 1 && rows.length > 0) {
+    const channels = [...new Set(rows.map(r=>r.channel).filter(Boolean))];
+    channels.forEach(ch => {
+      if ([...channelSel.options].some(o=>o.value===ch)) return;
+      const opt = document.createElement('option'); opt.value=ch; opt.textContent=ch; channelSel.appendChild(opt);
+    });
+  }
+  if (catSel.options.length <= 1 && rows.length > 0) {
+    const cats = [...new Set(rows.map(r=>r.catalog).filter(Boolean))];
+    cats.forEach(c => {
+      if ([...catSel.options].some(o=>o.value===c)) return;
+      const opt = document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt);
+    });
+  }
+}
+
+function _renderPriceTableLocal() {
+  const search   = document.getElementById('price-search').value.toLowerCase();
+  const statusF  = document.getElementById('price-status-filter').value;
+  const channelF = document.getElementById('price-channel-filter').value;
+  const catF     = document.getElementById('price-cat-filter').value;
+
+  const channelSel = document.getElementById('price-channel-filter');
+  if (channelSel.options.length <= 1) {
+    [...new Set(DB.prices.map(p=>p.channel))].forEach(ch => {
+      const opt = document.createElement('option'); opt.value=ch; opt.textContent=ch; channelSel.appendChild(opt);
+    });
+  }
+  const catSel = document.getElementById('price-cat-filter');
+  if (catSel.options.length <= 1) {
+    [...new Set(DB.prices.map(p=>p.catalog).filter(Boolean))].forEach(c => {
+      const opt = document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt);
+    });
+  }
+
+  let data = [...DB.prices];
+  if (search)   data = data.filter(r => r.product_code?.toLowerCase().includes(search) || r.channel.toLowerCase().includes(search) || r.product_name?.toLowerCase().includes(search));
+  if (statusF)  data = data.filter(r => r.status === statusF);
+  if (channelF) data = data.filter(r => r.channel === channelF);
+  if (catF)     data = data.filter(r => r.catalog === catF);
+
+  data.sort((a,b) => {
+    const va = a[priceSortField], vb = b[priceSortField];
+    if (va == null) return 1; if (vb == null) return -1;
+    const r = typeof va === 'number' ? va-vb : String(va).localeCompare(String(vb));
+    return priceSortAsc ? r : -r;
+  });
+
+  document.getElementById('price-count-label').textContent = `${data.length} listings`;
+  const pages = Math.ceil(data.length / PRICE_PAGE_SIZE);
+  if (pricePage > pages) pricePage = 1;
+  const slice = data.slice((pricePage-1)*PRICE_PAGE_SIZE, pricePage*PRICE_PAGE_SIZE);
+
+  const tbody = document.getElementById('tbody-prices');
+  if (slice.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">🔍</div>' +
+      (DB.prices.length === 0 ? 'No crawl data yet. Run a crawl to populate.' : 'No results match your filters.') +
+      '</div></td></tr>';
+  } else {
+    tbody.innerHTML = slice.map(r => {
+      const pd  = r.price_diff;
+      const pct = r.diff_pct ?? r.price_diff_pct;
+      const lp  = r.listing_price;
+      const diffClass  = pd < 0 ? 'diff-neg' : pd > 0 ? 'diff-pos' : '';
+      const priceClass = r.status === 'Critical' ? 'price-critical' : pd < 0 ? 'price-low' : pd > 0 ? 'price-high' : '';
+      return `<tr>
+        <td>${r.channel}</td>
+        <td><strong>${r.product_code||r.product_model}</strong><br><small style="color:var(--text-muted)">${(r.product_name||'').substring(0,35)}...</small></td>
+        <td class="price">$${(+r.msrp).toFixed(2)}</td>
+        <td class="price ${priceClass}">$${(+lp).toFixed(2)}</td>
+        <td class="${diffClass}">$${pd > 0 ? '+' : ''}${(+pd).toFixed(2)}</td>
+        <td class="${diffClass}">${pct > 0 ? '+' : ''}${(+pct).toFixed(1)}%</td>
+        <td>${statusBadge(r.status)}</td>
+        <td><a href="${r.product_url}" target="_blank" class="link-icon">↗</a></td>
+        <td style="color:var(--text-muted);font-size:11px;">${formatTime(new Date(r.crawl_time))}</td>
+        <td><button class="btn" style="padding:4px 8px;font-size:11px;" onclick="showHistory('${r.product_code||r.product_model}','${r.channel}')">📈</button></td>
+      </tr>`;
+    }).join('');
+  }
+  renderPagination('price-pagination', pricePage, pages, p => { pricePage = p; renderPriceTable(); });
+}
+
+function sortPrices(field) {
+  if (priceSortField === field) priceSortAsc = !priceSortAsc;
+  else { priceSortField = field; priceSortAsc = true; }
+  renderPriceTable();
+}
+
+// =====================================================
+// HISTORY PAGE — 真实 API
+// =====================================================
+async function renderHistoryPage() {
+  if (API_BASE) {
+    // 用 products 列表填充选择器
+    const products = await apiFetch('/api/products');
+    const channels = await apiFetch('/api/channels');
+    const modelSel   = document.getElementById('hist-model');
+    const channelSel = document.getElementById('hist-channel');
+    if (modelSel.options.length <= 1 && products) {
+      products.forEach(p => {
+        const o = document.createElement('option'); o.value=p.code; o.textContent=`${p.code} — ${p.name}`; modelSel.appendChild(o);
+      });
+    }
+    if (channelSel.options.length <= 1 && channels) {
+      channels.forEach(c => {
+        const o = document.createElement('option'); o.value=c.name; o.textContent=c.name; channelSel.appendChild(o);
+      });
+    }
+  } else {
+    const modelSel = document.getElementById('hist-model');
+    const channelSel = document.getElementById('hist-channel');
+    const models = [...new Set(DB.history.map(h=>h.product_code||h.product_model))];
+    if (modelSel.options.length <= 1) {
+      models.forEach(m => { const o=document.createElement('option');o.value=m;o.textContent=m;modelSel.appendChild(o); });
+    }
+    const chs = [...new Set(DB.history.map(h=>h.channel))];
+    if (channelSel.options.length <= 1) {
+      chs.forEach(c => { const o=document.createElement('option');o.value=c;o.textContent=c;channelSel.appendChild(o); });
+    }
+  }
+  renderHistory();
+}
+
+async function renderHistory() {
+  const model   = document.getElementById('hist-model').value;
+  const channel = document.getElementById('hist-channel').value;
+  const days    = parseInt(document.getElementById('hist-days').value);
+  const ctx = document.getElementById('chart-history');
+  if (!ctx || !model) { if (window._chartHist) window._chartHist.destroy(); return; }
+
+  let histData = [];
+  if (API_BASE) {
+    const params = new URLSearchParams({ product_code: model, days });
+    if (channel) params.set('channel', channel);
+    histData = await apiFetch('/api/history?' + params.toString()) || [];
+  } else {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+    histData = DB.history.filter(h => (h.product_code||h.product_model)===model && new Date(h.date)>=cutoff);
+    if (channel) histData = histData.filter(h => h.channel === channel);
+  }
+
+  // 按日期+渠道分组
+  const dateMap = {};
+  histData.forEach(h => {
+    if (!dateMap[h.date]) dateMap[h.date] = {};
+    dateMap[h.date][h.channel] = h.listing_price;
+  });
+  const dates = Object.keys(dateMap).sort();
+  const chs = channel ? [channel] : [...new Set(histData.map(h=>h.channel))];
+  const palette = ['#4895ef','#e63946','#2dc653','#f4a261','#9b72cf','#ff5000','#7ec8e3'];
+
+  const msrpRow = histData.find(h => h.msrp != null);
+  const msrpVal = msrpRow?.msrp;
+
+  const datasets = chs.map((ch, i) => ({
+    label: ch,
+    data: dates.map(d => dateMap[d]?.[ch] ?? null),
+    borderColor: palette[i % palette.length],
+    backgroundColor: palette[i % palette.length] + '20',
+    tension: 0.3, pointRadius: 4, fill: false
+  }));
+  if (msrpVal) {
+    datasets.unshift({ label:'MSRP', data: dates.map(()=>msrpVal), borderColor:'#fff', borderDash:[5,5], pointRadius:0, borderWidth:1.5, fill:false });
+  }
+
+  if (window._chartHist) window._chartHist.destroy();
+  window._chartHist = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid:{color:'#2d3148'}, ticks:{color:'#8892a4'} },
+        y: { grid:{color:'#2d3148'}, ticks:{color:'#8892a4', callback:v=>'$'+v} }
+      },
+      plugins: { legend:{labels:{color:'#8892a4'}} }
+    }
+  });
+}
+
+async function showHistory(model, channel) {
+  openModal('modal-history');
+  document.getElementById('modal-hist-title').textContent = `Price History — ${model} @ ${channel}`;
+  setTimeout(async () => {
+    const ctx = document.getElementById('chart-modal-hist');
+    if (window._chartModalHist) window._chartModalHist.destroy();
+
+    let data = [];
+    if (API_BASE) {
+      const params = new URLSearchParams({ product_code: model, channel, days: 90 });
+      data = await apiFetch('/api/history?' + params.toString()) || [];
+    } else {
+      data = DB.history.filter(h => (h.product_code||h.product_model)===model && h.channel===channel).sort((a,b)=>a.date.localeCompare(b.date));
+    }
+
+    const msrpVal = data[0]?.msrp;
+    window._chartModalHist = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map(h=>h.date),
+        datasets: [
+          { label:channel, data:data.map(h=>h.listing_price), borderColor:'#4895ef', backgroundColor:'#4895ef20', tension:0.3, pointRadius:5, fill:true },
+          { label:'MSRP', data:data.map(()=>msrpVal), borderColor:'#fff', borderDash:[5,5], pointRadius:0, fill:false }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        scales: {
+          x:{grid:{color:'#2d3148'},ticks:{color:'#8892a4'}},
+          y:{grid:{color:'#2d3148'},ticks:{color:'#8892a4',callback:v=>'$'+v}}
+        },
+        plugins:{legend:{labels:{color:'#8892a4'}}}
+      }
+    });
+  }, 100);
+}
+
+// =====================================================
+// PRODUCT TABLE — 真实 API
+// =====================================================
+let prodSortField = 'catalog', prodSortAsc = true, prodPage = 1;
+const PROD_PAGE_SIZE = 20;
+let editingProductId = null;
+
+async function renderProductTable() {
+  if (API_BASE) {
+    const search = document.getElementById('prod-search').value.trim();
+    const catF   = document.getElementById('prod-cat-filter').value;
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    if (catF)   params.set('catalog', catF);
+
+    const data = await apiFetch('/api/products?' + params.toString()) || [];
+
+    const catSel = document.getElementById('prod-cat-filter');
+    if (catSel.options.length <= 1) {
+      [...new Set(data.map(p=>p.catalog))].sort().forEach(c => {
+        const o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);
+      });
+    }
+
+    document.getElementById('prod-count-label').textContent = `${data.length} products`;
+    const pages = Math.ceil(data.length / PROD_PAGE_SIZE);
+    if (prodPage > pages) prodPage = 1;
+    const slice = data.slice((prodPage-1)*PROD_PAGE_SIZE, prodPage*PROD_PAGE_SIZE);
+
+    const tbody = document.getElementById('tbody-products');
+    tbody.innerHTML = slice.map(p => `
+      <tr>
+        <td><span class="badge badge-normal" style="background:transparent;border-color:var(--border)">${p.catalog}</span></td>
+        <td><code style="color:var(--blue);font-size:12px;">${p.code}</code></td>
+        <td>${p.name}</td>
+        <td class="price" style="color:var(--green);">$${(+p.msrp).toFixed(2)}</td>
+        <td><span class="badge ${p.status==='Active'?'badge-normal':'badge-missing'}">${p.status}</span></td>
+        <td style="display:flex;gap:4px;">
+          <button class="btn" style="padding:4px 8px;font-size:11px;" onclick="editProduct(${p.id})">✏️</button>
+          <button class="btn danger" style="padding:4px 8px;font-size:11px;" onclick="deleteProduct(${p.id})">🗑</button>
+        </td>
+      </tr>
+    `).join('');
+    renderPagination('prod-pagination', prodPage, pages, p => { prodPage = p; renderProductTable(); });
+
+  } else {
+    _renderProductTableLocal();
+  }
+}
+
+function _renderProductTableLocal() {
+  const search = document.getElementById('prod-search').value.toLowerCase();
+  const catF   = document.getElementById('prod-cat-filter').value;
+
+  const catSel = document.getElementById('prod-cat-filter');
+  if (catSel.options.length <= 1) {
+    [...new Set(DB.products.map(p=>p.catalog))].sort().forEach(c => {
+      const o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);
+    });
+  }
+
+  let data = [...DB.products];
+  if (search) data = data.filter(p => p.code.toLowerCase().includes(search) || p.name.toLowerCase().includes(search));
+  if (catF)   data = data.filter(p => p.catalog === catF);
+  data.sort((a,b) => {
+    const va=a[prodSortField], vb=b[prodSortField];
+    if (va==null) return 1; if (vb==null) return -1;
+    const r = typeof va==='number'? va-vb : String(va).localeCompare(String(vb));
+    return prodSortAsc ? r : -r;
+  });
+
+  document.getElementById('prod-count-label').textContent = `${data.length} products`;
+  const pages = Math.ceil(data.length / PROD_PAGE_SIZE);
+  if (prodPage > pages) prodPage = 1;
+  const slice = data.slice((prodPage-1)*PROD_PAGE_SIZE, prodPage*PROD_PAGE_SIZE);
+
+  const tbody = document.getElementById('tbody-products');
+  tbody.innerHTML = slice.map(p => `
+    <tr>
+      <td><span class="badge badge-normal" style="background:transparent;border-color:var(--border)">${p.catalog}</span></td>
+      <td><code style="color:var(--blue);font-size:12px;">${p.code}</code></td>
+      <td>${p.name}</td>
+      <td class="price" style="color:var(--green);">$${(+p.msrp).toFixed(2)}</td>
+      <td><span class="badge ${p.status==='Active'?'badge-normal':'badge-missing'}">${p.status}</span></td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn" style="padding:4px 8px;font-size:11px;" onclick="editProductLocal('${p.code}')">✏️</button>
+        <button class="btn danger" style="padding:4px 8px;font-size:11px;" onclick="deleteProductLocal('${p.code}')">🗑</button>
+      </td>
+    </tr>
+  `).join('');
+  renderPagination('prod-pagination', prodPage, pages, p => { prodPage = p; renderProductTable(); });
+}
+
+function openAddProductModal() {
+  editingProductId = null;
+  document.getElementById('modal-product-title').textContent = 'Add Product';
+  ['p-code','p-name','p-msrp'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('p-cat').value = 'Wheel Base';
+  document.getElementById('p-status').value = 'Active';
+  document.getElementById('p-code').disabled = false;
+  openModal('modal-product');
+}
+
+async function editProduct(id) {
+  if (API_BASE) {
+    const products = await apiFetch('/api/products') || [];
+    const p = products.find(pr => pr.id === id);
+    if (!p) return;
+    editingProductId = id;
+    document.getElementById('modal-product-title').textContent = 'Edit Product';
+    document.getElementById('p-code').value = p.code; document.getElementById('p-code').disabled = true;
+    document.getElementById('p-name').value = p.name;
+    document.getElementById('p-cat').value = p.catalog;
+    document.getElementById('p-msrp').value = p.msrp;
+    document.getElementById('p-status').value = p.status;
+    openModal('modal-product');
+  } else {
+    editProductLocal(id);
+  }
+}
+
+function editProductLocal(code) {
+  const p = DB.products.find(pr => pr.code === code);
+  if (!p) return;
+  editingProductId = code;
+  document.getElementById('modal-product-title').textContent = 'Edit Product';
+  document.getElementById('p-code').value = p.code; document.getElementById('p-code').disabled = true;
+  document.getElementById('p-name').value = p.name;
+  document.getElementById('p-cat').value = p.catalog;
+  document.getElementById('p-msrp').value = p.msrp;
+  document.getElementById('p-status').value = p.status;
+  openModal('modal-product');
+}
+
+async function saveProduct() {
+  const code  = document.getElementById('p-code').value.trim().toUpperCase();
+  const name  = document.getElementById('p-name').value.trim();
+  const msrp  = parseFloat(document.getElementById('p-msrp').value);
+  const cat   = document.getElementById('p-cat').value;
+  const status = document.getElementById('p-status').value;
+  if (!code || !name || isNaN(msrp)) { toast('Please fill all required fields', 'error'); return; }
+
+  if (API_BASE) {
+    let res;
+    if (editingProductId) {
+      res = await apiFetch(`/api/products/${editingProductId}`, { method:'PUT', body: JSON.stringify({code,name,catalog:cat,msrp,status}) });
+    } else {
+      res = await apiFetch('/api/products', { method:'POST', body: JSON.stringify({code,name,catalog:cat,msrp,status}) });
+    }
+    if (!res || res.error) { toast(res?.error || 'Save failed', 'error'); return; }
+  } else {
+    if (editingProductId) {
+      const idx = DB.products.findIndex(p=>p.code===editingProductId);
+      DB.products[idx] = {...DB.products[idx], name, catalog:cat, msrp, status};
+    } else {
+      if (DB.products.find(p=>p.code===code)) { toast('Product code already exists', 'error'); return; }
+      DB.products.push({ code, name, catalog:cat, msrp, status });
+    }
+    saveStore();
+  }
+  closeModal('modal-product'); renderProductTable();
+  toast('✅ Product saved', 'success');
+}
+
+async function deleteProduct(id) {
+  if (!confirm(`Delete product? This cannot be undone.`)) return;
+  if (API_BASE) {
+    await apiFetch(`/api/products/${id}`, { method:'DELETE' });
+  } else {
+    DB.products = DB.products.filter(p => p.id !== id);
+    saveStore();
+  }
+  renderProductTable();
+  toast('Product deleted', 'warning');
+}
+
+function deleteProductLocal(code) {
+  if (!confirm(`Delete product ${code}?`)) return;
+  DB.products = DB.products.filter(p => p.code !== code);
+  saveStore(); renderProductTable();
+  toast('Product deleted', 'warning');
+}
+
+function openImportModal() {
+  toast('📂 Import: Use the Excel files in the project folder. (In backend mode: restart server to re-seed)', 'success');
+}
+
+// =====================================================
+// CHANNELS — 真实 API
+// =====================================================
+let editingChannelId = null;
+
+async function renderChannels() {
+  let channels;
+  if (API_BASE) {
+    channels = await apiFetch('/api/channels') || [];
+  } else {
+    channels = DB.channels;
+  }
+  const grid = document.getElementById('channel-grid');
+  grid.innerHTML = channels.map(ch => `
+    <div class="channel-card">
+      <div class="channel-card-header">
+        <div class="channel-name">${ch.name}</div>
+        <span class="badge ${ch.status==='Active'?'badge-normal':'badge-missing'}">${ch.status}</span>
+      </div>
+      <div class="channel-url">${ch.url}</div>
+      <div class="channel-meta">
+        <span class="meta-tag">🏷 ${ch.type}</span>
+        <span class="meta-tag">⏱ ${ch.freq}</span>
+        ${ch.note ? `<span class="meta-tag">📌 ${ch.note}</span>` : ''}
+      </div>
+      <div class="channel-actions">
+        <button class="btn" style="flex:1;" onclick="editChannel(${ch.id})">✏️ Edit</button>
+        <button class="btn danger" style="flex:1;" onclick="deleteChannel(${ch.id})">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAddChannelModal() {
+  editingChannelId = null;
+  document.getElementById('modal-channel-title').textContent = 'Add Channel';
+  ['ch-name','ch-url','ch-listing-url'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('ch-type').value = 'Third-party';
+  document.getElementById('ch-freq').value = 'daily';
+  document.getElementById('ch-status').value = 'Active';
+  openModal('modal-channel');
+}
+
+async function editChannel(id) {
+  let ch;
+  if (API_BASE) {
+    const channels = await apiFetch('/api/channels') || [];
+    ch = channels.find(c=>c.id===id);
+  } else {
+    ch = DB.channels.find(c=>c.id===id);
+  }
+  if (!ch) return;
+  editingChannelId = id;
+  document.getElementById('modal-channel-title').textContent = 'Edit Channel';
+  document.getElementById('ch-name').value = ch.name;
+  document.getElementById('ch-url').value = ch.url;
+  document.getElementById('ch-listing-url').value = ch.listing_url || ch.listingUrl || '';
+  document.getElementById('ch-type').value = ch.type;
+  document.getElementById('ch-freq').value = ch.freq;
+  document.getElementById('ch-status').value = ch.status;
+  openModal('modal-channel');
+}
+
+async function saveChannel() {
+  const name = document.getElementById('ch-name').value.trim();
+  const url  = document.getElementById('ch-url').value.trim();
+  if (!name || !url) { toast('Name and URL are required', 'error'); return; }
+  const data = { name, url, listing_url: document.getElementById('ch-listing-url').value.trim(),
+    type: document.getElementById('ch-type').value, freq: document.getElementById('ch-freq').value,
+    status: document.getElementById('ch-status').value, note: '' };
+
+  if (API_BASE) {
+    let res;
+    if (editingChannelId) {
+      res = await apiFetch(`/api/channels/${editingChannelId}`, { method:'PUT', body:JSON.stringify(data) });
+    } else {
+      res = await apiFetch('/api/channels', { method:'POST', body:JSON.stringify(data) });
+    }
+    if (!res || res.error) { toast(res?.error || 'Save failed', 'error'); return; }
+  } else {
+    if (editingChannelId) {
+      const idx = DB.channels.findIndex(c=>c.id===editingChannelId);
+      DB.channels[idx] = {...DB.channels[idx], ...data};
+    } else {
+      DB.channels.push({...data, id: DB.nextId++, listingUrl: data.listing_url});
+    }
+    saveStore();
+  }
+  closeModal('modal-channel'); renderChannels();
+  toast('✅ Channel saved', 'success');
+}
+
+async function deleteChannel(id) {
+  if (!confirm('Delete this channel?')) return;
+  if (API_BASE) {
+    await apiFetch(`/api/channels/${id}`, { method:'DELETE' });
+  } else {
+    DB.channels = DB.channels.filter(c=>c.id!==id);
+    saveStore();
+  }
+  renderChannels();
+  toast('Channel deleted', 'warning');
+}
+
+// =====================================================
+// LOGS — 真实 API
+// =====================================================
+async function renderLogs() {
+  let logs;
+  if (API_BASE) {
+    logs = await apiFetch('/api/tasks?limit=30') || [];
+  } else {
+    logs = DB.logs;
+  }
+  const logList = document.getElementById('log-list');
+  if (!logs || logs.length === 0) {
+    logList.innerHTML = '<div class="empty-state" style="padding:60px;"><div class="empty-icon">📋</div>No crawl tasks yet.</div>';
+    return;
+  }
+  logList.innerHTML = logs.map(log => `
+    <div class="log-entry">
+      <div class="log-dot ${log.status}"></div>
+      <div class="log-content">
+        <div class="log-title">${log.title}</div>
+        <div class="log-meta">
+          ${log.status === 'running' ? '⟳ Running...' : ''}
+          ${log.status === 'success' ? `✅ Success — ${log.products} listings • ${log.channels} channels • ${log.anomalies} anomalies` : ''}
+          ${log.status === 'partial' ? `⚠️ Partial — ${log.products} listings • ${log.anomalies} anomalies` : ''}
+          ${log.status === 'error' ? '❌ Failed' : ''}
+          &nbsp;|&nbsp; Started: ${log.start_time ? formatTime(new Date(log.start_time)) : formatTime(new Date(log.startTime||''))}
+          ${(log.end_time||log.endTime) ? ' | Duration: ' + Math.round((new Date(log.end_time||log.endTime) - new Date(log.start_time||log.startTime)) / 1000) + 's' : ''}
+        </div>
+        ${log.details ? `<div class="log-details">${log.details}</div>` : ''}
+        ${(log.errors||[]).length > 0 ? `<div class="log-details" style="color:var(--red)">Errors: ${(log.errors||[]).join('; ')}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearLogs() {
+  if (!API_BASE) {
+    if (!confirm('Clear all logs?')) return;
+    DB.logs = []; saveStore(); renderLogs();
+  } else {
+    toast('Log clearing not supported in backend mode', 'warning');
+  }
+}
+
+// =====================================================
+// SETTINGS — 真实 API
+// =====================================================
+async function renderSettings() {
+  if (API_BASE) {
+    const s = await apiFetch('/api/settings') || {};
+    document.getElementById('setting-crawl-time').value = s.crawl_time || '08:00';
+    document.getElementById('setting-tz').value = s.tz || 'ET';
+    document.getElementById('setting-retry').value = s.retry || '3';
+    document.getElementById('setting-delay').value = s.delay || '2';
+    document.getElementById('thresh-low').value = s.thresh_low || '5';
+    document.getElementById('thresh-high').value = s.thresh_high || '10';
+    document.getElementById('thresh-critical').value = s.thresh_critical || '20';
+    document.getElementById('setting-auto-export').value = s.auto_export || 'yes';
+  } else {
+    document.getElementById('setting-crawl-time').value = DB.settings.crawlTime;
+    document.getElementById('setting-tz').value = DB.settings.tz;
+    document.getElementById('setting-retry').value = DB.settings.retry;
+    document.getElementById('setting-delay').value = DB.settings.delay;
+    document.getElementById('thresh-low').value = DB.settings.threshLow;
+    document.getElementById('thresh-high').value = DB.settings.threshHigh;
+    document.getElementById('thresh-critical').value = DB.settings.threshCritical;
+    document.getElementById('setting-auto-export').value = DB.settings.autoExport;
+  }
+}
+
+async function saveSettings() {
+  const data = {
+    crawl_time: document.getElementById('setting-crawl-time').value,
+    tz: document.getElementById('setting-tz').value,
+    retry: document.getElementById('setting-retry').value,
+    delay: document.getElementById('setting-delay').value,
+  };
+  if (API_BASE) {
+    const res = await apiFetch('/api/settings', { method:'POST', body:JSON.stringify(data) });
+    if (!res) { toast('Save failed', 'error'); return; }
+  } else {
+    DB.settings.crawlTime = data.crawl_time; DB.settings.tz = data.tz;
+    DB.settings.retry = parseInt(data.retry); DB.settings.delay = parseInt(data.delay);
+    saveStore();
+  }
+  toast('✅ Settings saved', 'success');
+}
+
+async function saveThresholds() {
+  const data = {
+    thresh_low: document.getElementById('thresh-low').value,
+    thresh_high: document.getElementById('thresh-high').value,
+    thresh_critical: document.getElementById('thresh-critical').value,
+    auto_export: document.getElementById('setting-auto-export').value,
+  };
+  if (API_BASE) {
+    const res = await apiFetch('/api/settings', { method:'POST', body:JSON.stringify(data) });
+    if (!res) { toast('Save failed', 'error'); return; }
+  } else {
+    DB.settings.threshLow = parseInt(data.thresh_low);
+    DB.settings.threshHigh = parseInt(data.thresh_high);
+    DB.settings.threshCritical = parseInt(data.thresh_critical);
+    DB.settings.autoExport = data.auto_export;
+    saveStore();
+  }
+  toast('✅ Thresholds saved', 'success');
+}
+
+// =====================================================
+// EXPORT — 真实 API
+// =====================================================
+async function exportExcel() {
+  if (API_BASE) {
+    const url = API_BASE + '/api/export?format=csv';
+    const a = document.createElement('a');
+    a.href = url; a.download = `MOZA_PriceMonitor_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    toast('📥 CSV download started!', 'success');
+    return;
+  }
+  // 模拟模式
+  if (DB.prices.length === 0) { toast('No data to export. Run a crawl first.', 'error'); return; }
+  const headers = ['Channel','Model','Product Name','MSRP','Current Price','Price Diff','Diff %','Status','Product URL','Crawl Time'];
+  const rows = DB.prices.map(r => [
+    r.channel, r.product_code||r.product_model, r.product_name, r.msrp, r.listing_price,
+    r.price_diff, r.diff_pct??r.price_diff_pct, r.status, r.product_url,
+    formatTime(new Date(r.crawl_time))
+  ]);
+  let csv = headers.join(',') + '\n';
+  rows.forEach(row => { csv += row.map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',') + '\n'; });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `MOZA_PriceMonitor_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('📥 CSV exported!', 'success');
+}
+
+function exportReport() { exportExcel(); }
+
+// =====================================================
+// PAGINATION
+// =====================================================
+function renderPagination(containerId, currentPage, totalPages, onPage) {
+  const el = document.getElementById(containerId);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  const total = DB.prices.length || DB.products.length;
+  let html = `<span class="page-info">Page ${currentPage} of ${totalPages}</span>`;
+  if (currentPage > 1) html += `<button class="page-btn" onclick="(${onPage.toString()})(${currentPage-1})">‹</button>`;
+  const start = Math.max(1, currentPage-2), end = Math.min(totalPages, currentPage+2);
+  for (let i=start; i<=end; i++) {
+    html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="(${onPage.toString()})(${i})">${i}</button>`;
+  }
+  if (currentPage < totalPages) html += `<button class="page-btn" onclick="(${onPage.toString()})(${currentPage+1})">›</button>`;
+  el.innerHTML = html;
+}
+
+// =====================================================
+// MODAL HELPERS
+// =====================================================
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// =====================================================
+// STATUS BADGE
+// =====================================================
+function statusBadge(status) {
+  const map = {
+    'Normal': 'badge-normal',
+    'Price Low': 'badge-low',
+    'Price High': 'badge-high',
+    'Critical': 'badge-critical',
+    'Missing': 'badge-missing',
+    'Unauthorized': 'badge-unauth'
+  };
+  const icons = { 'Normal':'✅','Price Low':'🔻','Price High':'🔺','Critical':'🚨','Missing':'❌','Unauthorized':'⛔' };
+  return `<span class="badge ${map[status]||'badge-normal'}">${icons[status]||''} ${status}</span>`;
+}
+
+// =====================================================
+// TOAST
+// =====================================================
+function toast(msg, type='success') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity 0.3s'; setTimeout(()=>el.remove(),300); }, 3000);
+}
+
+// =====================================================
+// UTILS
+// =====================================================
+function formatDate(d) {
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+function formatTime(d) {
+  return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+}
+
+// =====================================================
+// INIT — 启动时检测后端连接
+// =====================================================
+window.onload = async function() {
+  // 加 CSS 动画
+  const style = document.createElement('style');
+  style.textContent = '@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }';
+  document.head.appendChild(style);
+
+  if (API_BASE) {
+    // 检测后端是否可用
+    const health = await apiFetch('/api/dashboard');
+    if (health) {
+      document.getElementById('hdr-products').textContent = health.total_products || '—';
+      document.getElementById('nav-anomaly-count').textContent = health.anomalies || 0;
+      if (health.last_crawl) {
+        document.getElementById('hdr-last-crawl').textContent = formatTime(new Date(health.last_crawl));
+      }
+      toast('✅ Connected to backend server', 'success');
+    } else {
+      toast('⚠️ Backend offline — running in simulation mode', 'warning');
+    }
+  } else {
+    // 文件直接打开 — 模拟模式
+    document.getElementById('hdr-products').textContent = DB.products.filter(p=>p.status==='Active').length;
+    if (DB.lastCrawlTime) document.getElementById('hdr-last-crawl').textContent = formatTime(new Date(DB.lastCrawlTime));
+    const anomalies = DB.prices.filter(p=>p.status!=='Normal').length;
+    document.getElementById('nav-anomaly-count').textContent = anomalies;
+    toast('ℹ️ Running in offline simulation mode (open via server for full features)', 'success');
+  }
+
+  renderDashboard();
+};
+</script>
+</body>
+</html>
