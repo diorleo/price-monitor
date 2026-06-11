@@ -705,11 +705,14 @@ th.sort-asc .sort-arrow, th.sort-desc .sort-arrow { opacity: 1; color: var(--blu
 // =====================================================
 // API BASE — 连接后端，或降级到纯前端模拟模式
 // =====================================================
+const RENDER_BACKEND = 'https://moza-price-monitor.onrender.com';
 const API_BASE = (() => {
   // 如果是从文件直接打开（file://），使用模拟模式
   if (location.protocol === 'file:') return null;
-  // 否则指向 Flask 后端
-  return location.origin;
+  // 如果运行在本地开发服务器（127.0.0.1 或 localhost），连本地后端
+  if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') return location.origin;
+  // 其他环境（GitHub Pages、CDN 等）统一指向 Render 后端
+  return RENDER_BACKEND;
 })();
 
 async function apiFetch(path, opts = {}) {
