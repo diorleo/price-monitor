@@ -882,6 +882,38 @@ function navigate(page) {
 let crawlInProgress = false;
 let crawlPollInterval = null;
 
+// 将 localStorage 中的渠道同步到后端（解决 Render 重启后 DB 重置导致渠道丢失）
+async function syncChannelsToBackend() {
+  if (!API_BASE) return;
+  const stored = loadStore();
+  if (!stored || !stored.channels || stored.channels.length === 0) return;
+
+  const apiChannels = await apiFetch('/api/channels') || [];
+  const apiIds = new Set(apiChannels.map(c => c.id));
+  const apiNames = new Set(apiChannels.map(c => c.name));
+
+  for (const ch of stored.channels) {
+    // 通过 id 或 name 判断渠道是否已在后端
+    if (apiIds.has(ch.id) || apiNames.has(ch.name)) continue;
+
+    const data = {
+      name: ch.name,
+      url: ch.url || '',
+      listing_url: ch.listing_url || ch.listingUrl || '',
+      type: ch.type || 'Third-party',
+      freq: ch.freq || 'daily',
+      status: ch.status || 'Active',
+      note: ch.note || ''
+    };
+    const res = await apiFetch('/api/channels', { method: 'POST', body: JSON.stringify(data) });
+    if (res && res.id) {
+      ch.id = res.id;  // 用后端分配的新 id 更新 localStorage
+      saveStore();
+      console.log('[Sync] Channel synced to backend:', ch.name, '→ id:', res.id);
+    }
+  }
+}
+
 async function triggerCrawl() {
   if (crawlInProgress) return;
 
@@ -891,6 +923,9 @@ async function triggerCrawl() {
   crawlInProgress = true;
 
   if (API_BASE) {
+    // ── 同步 localStorage 渠道到后端，确保 crawl 覆盖所有渠道 ──
+    await syncChannelsToBackend();
+
     // ── 真实后端模式 ──────────────────────────────────
     const res = await apiFetch('/api/crawl', { method: 'POST' });
     if (!res) {
@@ -1038,7 +1073,20 @@ async function renderDashboard() {
     const data = await apiFetch('/api/dashboard');
     if (!data) { toast('Cannot connect to backend server', 'error'); return; }
 
-    document.getElementById('stat-channels').textContent = data.total_channels;
+    // ── 合并 localStorage 渠道数（Render 重启后 DB 可能不完整）──
+    const stored = loadStore();
+    let mergedChCount = data.total_channels;
+    if (stored && stored.channels) {
+      const apiChannels = await apiFetch('/api/channels') || [];
+      const apiIds = new Set(apiChannels.map(c => c.id));
+      const apiNames = new Set(apiChannels.map(c => c.name));
+      for (const ch of stored.channels) {
+        if (ch.status === 'Active' && !apiIds.has(ch.id) && !apiNames.has(ch.name)) {
+          mergedChCount++;
+        }
+      }
+    }
+    document.getElementById('stat-channels').textContent = mergedChCount;
     document.getElementById('stat-products').textContent = data.total_products;
     document.getElementById('hdr-products').textContent = data.total_products;
     document.getElementById('stat-anomalies').textContent = data.anomalies;
