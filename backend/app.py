@@ -32,6 +32,20 @@ _WEBAPP = os.path.join(_HERE, '..', 'webapp')
 app = Flask(__name__, static_folder=_WEBAPP, static_url_path='')
 CORS(app)  # 允许前端跨域调用
 
+# ── 安全头（覆盖 Render 默认 CSP，允许 Chart.js 正常运行）──────────────────
+@app.after_request
+def _relax_csp(response):
+    """移除 Render 强制的严格 CSP，允许 inline-script / eval（Chart.js 需要）"""
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self' https:; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https:; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https:; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https:; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
+    )
+    return response
+
 # ── APScheduler ──────────────────────────────────────────────────────────────
 scheduler = BackgroundScheduler(daemon=True)
 scheduler.start()

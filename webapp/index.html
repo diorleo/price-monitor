@@ -1457,7 +1457,18 @@ async function renderProductTable() {
     if (search) params.set('q', search);
     if (catF)   params.set('catalog', catF);
 
-    const data = await apiFetch('/api/products?' + params.toString()) || [];
+    let data = await apiFetch('/api/products?' + params.toString()) || [];
+
+    // ── 用 localStorage 补齐 Render 重启后丢失的用户产品 ──
+    const stored = loadStore();
+    if (stored && stored.products) {
+      const apiIds = new Set(data.map(p => p.id));
+      const apiCodes = new Set(data.map(p => p.code));
+      for (const sp of stored.products) {
+        if (!apiIds.has(sp.id) && !apiCodes.has(sp.code)) { data.push(sp); }
+      }
+    }
+    DB.products = data; saveStore();
 
     const catSel = document.getElementById('prod-cat-filter');
     if (catSel.options.length <= 1) {
@@ -1592,6 +1603,14 @@ async function saveProduct() {
       res = await apiFetch('/api/products', { method:'POST', body: JSON.stringify({code,name,catalog:cat,msrp,status}) });
     }
     if (!res || res.error) { toast(res?.error || 'Save failed', 'error'); return; }
+    // ── 同时缓存到 localStorage ──
+    if (editingProductId) {
+      const idx = DB.products.findIndex(p=>p.id===editingProductId);
+      if (idx >= 0) DB.products[idx] = {...DB.products[idx], name, catalog:cat, msrp, status};
+    } else {
+      DB.products.push({ id: res.id || DB.nextId++, code, name, catalog:cat, msrp, status });
+    }
+    saveStore();
   } else {
     if (editingProductId) {
       const idx = DB.products.findIndex(p=>p.code===editingProductId);
@@ -1610,6 +1629,9 @@ async function deleteProduct(id) {
   if (!confirm(`Delete product? This cannot be undone.`)) return;
   if (API_BASE) {
     await apiFetch(`/api/products/${id}`, { method:'DELETE' });
+    // ── 同时从 localStorage 删除 ──
+    DB.products = DB.products.filter(p => p.id !== id);
+    saveStore();
   } else {
     DB.products = DB.products.filter(p => p.id !== id);
     saveStore();
@@ -1638,6 +1660,16 @@ async function renderChannels() {
   let channels;
   if (API_BASE) {
     channels = await apiFetch('/api/channels') || [];
+    // ── 用 localStorage 补齐 Render 重启后丢失的用户渠道 ──
+    const stored = loadStore();
+    if (stored && stored.channels) {
+      const apiIds = new Set(channels.map(c => c.id));
+      for (const sc of stored.channels) {
+        if (!apiIds.has(sc.id)) { channels.push(sc); }
+      }
+    }
+    // 回写到 localStorage 作为持久缓存
+    DB.channels = channels; saveStore();
   } else {
     channels = DB.channels;
   }
@@ -1708,6 +1740,14 @@ async function saveChannel() {
       res = await apiFetch('/api/channels', { method:'POST', body:JSON.stringify(data) });
     }
     if (!res || res.error) { toast(res?.error || 'Save failed', 'error'); return; }
+    // ── 同时缓存到 localStorage，防止 Render 重启后数据丢失 ──
+    if (editingChannelId) {
+      const idx = DB.channels.findIndex(c=>c.id===editingChannelId);
+      if (idx >= 0) DB.channels[idx] = {...DB.channels[idx], ...data};
+    } else {
+      DB.channels.push({...data, id: res.id || DB.nextId++, listingUrl: data.listing_url});
+    }
+    saveStore();
   } else {
     if (editingChannelId) {
       const idx = DB.channels.findIndex(c=>c.id===editingChannelId);
@@ -1725,6 +1765,9 @@ async function deleteChannel(id) {
   if (!confirm('Delete this channel?')) return;
   if (API_BASE) {
     await apiFetch(`/api/channels/${id}`, { method:'DELETE' });
+    // ── 同时从 localStorage 删除 ──
+    DB.channels = DB.channels.filter(c=>c.id!==id);
+    saveStore();
   } else {
     DB.channels = DB.channels.filter(c=>c.id!==id);
     saveStore();
