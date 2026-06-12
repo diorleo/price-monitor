@@ -26,7 +26,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── Flask ────────────────────────────────────────────────────────────────────
-app = Flask(__name__, static_folder='../webapp', static_url_path='')
+# 用绝对路径定位 webapp 静态文件夹，兼容 gunicorn 从任意工作目录启动
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_WEBAPP = os.path.join(_HERE, '..', 'webapp')
+app = Flask(__name__, static_folder=_WEBAPP, static_url_path='')
 CORS(app)  # 允许前端跨域调用
 
 # ── APScheduler ──────────────────────────────────────────────────────────────
