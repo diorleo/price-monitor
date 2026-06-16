@@ -1272,8 +1272,8 @@ async function renderPriceTable() {
       }).join('');
     }
 
-    // 填充渠道/分类筛选器（只填一次）
-    _populatePriceFilters(slice);
+    // 填充渠道/分类筛选器（从渠道列表获取，而非价格数据）
+    _populatePriceFilters();
     renderPagination('price-pagination', pricePage, _pricePages, p => { pricePage = p; renderPriceTable(); });
 
   } else {
@@ -1282,20 +1282,40 @@ async function renderPriceTable() {
   }
 }
 
-function _populatePriceFilters(rows) {
+// 从渠道列表填充 price/channel 下拉框（不是从价格数据中提取）
+async function _populatePriceFilters() {
   const channelSel = document.getElementById('price-channel-filter');
   const catSel = document.getElementById('price-cat-filter');
-  if (channelSel.options.length <= 1 && rows.length > 0) {
-    const channels = [...new Set(rows.map(r=>r.channel).filter(Boolean))];
-    channels.forEach(ch => {
-      if ([...channelSel.options].some(o=>o.value===ch)) return;
-      const opt = document.createElement('option'); opt.value=ch; opt.textContent=ch; channelSel.appendChild(opt);
-    });
+
+  // ── 渠道下拉：从 API + localStorage 合并所有渠道 ──
+  const currentVal = channelSel.value;  // 保留当前选中值
+  // 清除旧选项，只保留 "All Channels"
+  while (channelSel.options.length > 1) channelSel.remove(1);
+
+  // 获取全部渠道：API + localStorage 用户自定义
+  const allChannels = API_BASE ? (await apiFetch('/api/channels') || []) : DB.channels;
+  const apiNames = new Set(allChannels.map(c => c.name));
+  // 补齐 localStorage 中但不在 API 里的用户渠道
+  if (API_BASE && DB.channels) {
+    for (const ch of DB.channels) {
+      if (!apiNames.has(ch.name)) { allChannels.push(ch); apiNames.add(ch.name); }
+    }
   }
-  if (catSel.options.length <= 1 && rows.length > 0) {
-    const cats = [...new Set(rows.map(r=>r.catalog).filter(Boolean))];
+  allChannels.forEach(ch => {
+    const opt = document.createElement('option');
+    opt.value = ch.name; opt.textContent = ch.name;
+    channelSel.appendChild(opt);
+  });
+  // 恢复之前选中的值（如果仍然存在）
+  if ([...channelSel.options].some(o => o.value === currentVal)) {
+    channelSel.value = currentVal;
+  }
+
+  // ── 分类下拉 ──
+  if (catSel.options.length <= 1) {
+    const cats = ['Bundle','Base','Grip','Throttle','Rudder','Accessory',
+                  'Wheel Base','Steering Wheel','Pedal','Wheel'];
     cats.forEach(c => {
-      if ([...catSel.options].some(o=>o.value===c)) return;
       const opt = document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt);
     });
   }
@@ -1308,11 +1328,12 @@ function _renderPriceTableLocal() {
   const catF     = document.getElementById('price-cat-filter').value;
 
   const channelSel = document.getElementById('price-channel-filter');
-  if (channelSel.options.length <= 1) {
-    [...new Set(DB.prices.map(p=>p.channel))].forEach(ch => {
-      const opt = document.createElement('option'); opt.value=ch; opt.textContent=ch; channelSel.appendChild(opt);
-    });
-  }
+  // 从所有渠道填充（而非仅从价格数据）
+  while (channelSel.options.length > 1) channelSel.remove(1);
+  const allChs = [...DEFAULT_CHANNELS, ...(DB.channels || [])];
+  [...new Set(allChs.map(ch => ch.name))].forEach(ch => {
+    const opt = document.createElement('option'); opt.value=ch; opt.textContent=ch; channelSel.appendChild(opt);
+  });
   const catSel = document.getElementById('price-cat-filter');
   if (catSel.options.length <= 1) {
     [...new Set(DB.prices.map(p=>p.catalog).filter(Boolean))].forEach(c => {
