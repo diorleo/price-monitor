@@ -883,18 +883,29 @@ let crawlInProgress = false;
 let crawlPollInterval = null;
 
 // 将 localStorage 中的渠道同步到后端（解决 Render 重启后 DB 重置导致渠道丢失）
+// 默认7个渠道的名字集合——用于区分"内置渠道"与"用户自定义渠道"
+const DEFAULT_CHANNEL_NAMES = new Set([
+  'Amazon US','Best Buy','B&H Photo','Newegg','Adorama','MOZA Official','Walmart'
+]);
+
+/**
+ * 将 DB.channels 里用户自定义渠道同步到后端。
+ * 每次 Run Crawl 前调用，确保 Render 重启后后端 DB 里也有这些渠道，
+ * 这样 crawl_engine.py 才会为它们生成价格数据。
+ */
 async function syncChannelsToBackend() {
   if (!API_BASE) return;
-  const stored = loadStore();
-  if (!stored || !stored.channels || stored.channels.length === 0) return;
 
+  // 只取用户新加的渠道（排除默认7个）
+  const userChannels = DB.channels.filter(ch => !DEFAULT_CHANNEL_NAMES.has(ch.name));
+  if (userChannels.length === 0) return;
+
+  // 拉取当前后端已有的渠道名
   const apiChannels = await apiFetch('/api/channels') || [];
-  const apiIds = new Set(apiChannels.map(c => c.id));
   const apiNames = new Set(apiChannels.map(c => c.name));
 
-  for (const ch of stored.channels) {
-    // 通过 id 或 name 判断渠道是否已在后端
-    if (apiIds.has(ch.id) || apiNames.has(ch.name)) continue;
+  for (const ch of userChannels) {
+    if (apiNames.has(ch.name)) continue;  // 后端已有，跳过
 
     const data = {
       name: ch.name,
@@ -907,9 +918,11 @@ async function syncChannelsToBackend() {
     };
     const res = await apiFetch('/api/channels', { method: 'POST', body: JSON.stringify(data) });
     if (res && res.id) {
-      ch.id = res.id;  // 用后端分配的新 id 更新 localStorage
+      ch.id = res.id;  // 更新 localStorage 中的 id
       saveStore();
-      console.log('[Sync] Channel synced to backend:', ch.name, '→ id:', res.id);
+      console.log('[Sync] Custom channel synced to backend:', ch.name, '→ id:', res.id);
+    } else {
+      console.warn('[Sync] Failed to sync channel:', ch.name, res);
     }
   }
 }
@@ -1074,17 +1087,16 @@ async function renderDashboard() {
     if (!data) { toast('Cannot connect to backend server', 'error'); return; }
 
     // ── 合并 localStorage 渠道数（Render 重启后 DB 可能不完整）──
-    const stored = loadStore();
     let mergedChCount = data.total_channels;
-    if (stored && stored.channels) {
+    // DB.channels 存的是用户自定义渠道（已排除默认7个）
+    if (DB.channels && DB.channels.length) {
       const apiChannels = await apiFetch('/api/channels') || [];
-      const apiIds = new Set(apiChannels.map(c => c.id));
       const apiNames = new Set(apiChannels.map(c => c.name));
-      for (const ch of stored.channels) {
-        if (ch.status === 'Active' && !apiIds.has(ch.id) && !apiNames.has(ch.name)) {
-          mergedChCount++;
-        }
+      let extra = 0;
+      for (const ch of DB.channels) {
+        if (ch.status === 'Active' && !apiNames.has(ch.name)) extra++;
       }
+      mergedChCount = data.total_channels + extra;
     }
     document.getElementById('stat-channels').textContent = mergedChCount;
     document.getElementById('stat-products').textContent = data.total_products;
@@ -1711,13 +1723,15 @@ async function renderChannels() {
     // ── 用 localStorage 补齐 Render 重启后丢失的用户渠道 ──
     const stored = loadStore();
     if (stored && stored.channels) {
-      const apiIds = new Set(channels.map(c => c.id));
+      const apiNames = new Set(channels.map(c => c.name));
       for (const sc of stored.channels) {
-        if (!apiIds.has(sc.id)) { channels.push(sc); }
+        // 只用 name 判断（Render 重启后 id 会重新分配，name 才是稳定的）
+        if (!apiNames.has(sc.name)) { channels.push(sc); }
       }
     }
-    // 回写到 localStorage 作为持久缓存
-    DB.channels = channels; saveStore();
+    // 只把用户自定义渠道写回 DB.channels / localStorage（默认渠道从 API 拿）
+    DB.channels = channels.filter(ch => !DEFAULT_CHANNEL_NAMES.has(ch.name));
+    saveStore();
   } else {
     channels = DB.channels;
   }
