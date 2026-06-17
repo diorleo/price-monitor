@@ -381,8 +381,8 @@ th.sort-asc .sort-arrow, th.sort-desc .sort-arrow { opacity: 1; color: var(--blu
           <select class="filter-select" id="price-status-filter" onchange="renderPriceTable()">
             <option value="">All Status</option>
             <option value="Normal">✅ Normal</option>
-            <option value="Price Low">🔻 Price Low</option>
-            <option value="Price High">🔺 Price High</option>
+            <option value="Low">🔻 Price Low</option>
+            <option value="High">🔺 Price High</option>
             <option value="Critical">🚨 Critical</option>
             <option value="Missing">❌ Missing</option>
             <option value="Unauthorized">⛔ Unauthorized</option>
@@ -1288,7 +1288,8 @@ async function _populatePriceFilters() {
   const catSel = document.getElementById('price-cat-filter');
 
   // ── 渠道下拉：从 API + localStorage 合并所有渠道 ──
-  const currentVal = channelSel.value;  // 保留当前选中值
+  const currentVal = channelSel.value;      // 保留当前渠道选中值
+  const currentCatVal = catSel.value;       // 保留当前分类选中值
   // 清除旧选项，只保留 "All Channels"
   while (channelSel.options.length > 1) channelSel.remove(1);
 
@@ -1311,13 +1312,17 @@ async function _populatePriceFilters() {
     channelSel.value = currentVal;
   }
 
-  // ── 分类下拉 ──
-  if (catSel.options.length <= 1) {
-    const cats = ['Bundle','Base','Grip','Throttle','Rudder','Accessory',
-                  'Wheel Base','Steering Wheel','Pedal','Wheel'];
-    cats.forEach(c => {
-      const opt = document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt);
-    });
+  // ── 分类下拉：每次重建（与产品数据库 catalog 字段值保持一致）──
+  while (catSel.options.length > 1) catSel.remove(1);
+  const cats = ['Accessory','Base','Bundle','Grip','Pedal','Rudder','Steering Wheel',
+                'Throttle','Wheel','Wheel Base'];
+  cats.forEach(c => {
+    const opt = document.createElement('option'); opt.value = c; opt.textContent = c;
+    catSel.appendChild(opt);
+  });
+  // 恢复之前选中的值
+  if ([...catSel.options].some(o => o.value === currentCatVal)) {
+    catSel.value = currentCatVal;
   }
 }
 
@@ -1334,12 +1339,16 @@ function _renderPriceTableLocal() {
   [...new Set(allChs.map(ch => ch.name))].forEach(ch => {
     const opt = document.createElement('option'); opt.value=ch; opt.textContent=ch; channelSel.appendChild(opt);
   });
+
+  // 分类下拉：每次重建，使用固定分类列表（与产品数据库 catalog 字段值对应）
   const catSel = document.getElementById('price-cat-filter');
-  if (catSel.options.length <= 1) {
-    [...new Set(DB.prices.map(p=>p.catalog).filter(Boolean))].forEach(c => {
-      const opt = document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt);
-    });
-  }
+  const savedCat = catSel.value;  // 保留当前选中值
+  while (catSel.options.length > 1) catSel.remove(1);
+  ['Accessory','Base','Bundle','Grip','Pedal','Rudder','Steering Wheel',
+   'Throttle','Wheel','Wheel Base'].forEach(c => {
+    const opt = document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt);
+  });
+  if ([...catSel.options].some(o => o.value === savedCat)) catSel.value = savedCat;
 
   let data = [...DB.prices];
   if (search)   data = data.filter(r => r.product_code?.toLowerCase().includes(search) || r.channel.toLowerCase().includes(search) || r.product_name?.toLowerCase().includes(search));
@@ -2031,14 +2040,15 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 function statusBadge(status) {
   const map = {
     'Normal': 'badge-normal',
-    'Price Low': 'badge-low',
-    'Price High': 'badge-high',
+    'Low': 'badge-low',
+    'High': 'badge-high',
     'Critical': 'badge-critical',
     'Missing': 'badge-missing',
     'Unauthorized': 'badge-unauth'
   };
-  const icons = { 'Normal':'✅','Price Low':'🔻','Price High':'🔺','Critical':'🚨','Missing':'❌','Unauthorized':'⛔' };
-  return `<span class="badge ${map[status]||'badge-normal'}">${icons[status]||''} ${status}</span>`;
+  const icons = { 'Normal':'✅','Low':'🔻','High':'🔺','Critical':'🚨','Missing':'❌','Unauthorized':'⛔' };
+  const labels = { 'Low':'Price Low','High':'Price High' };
+  return `<span class="badge ${map[status]||'badge-normal'}">${icons[status]||''} ${labels[status]||status}</span>`;
 }
 
 // =====================================================
