@@ -30,7 +30,7 @@ def get_headers():
         "User-Agent": random.choice(USER_AGENTS),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": random.choice(ACCEPT_LANGUAGES),
-        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Encoding": "gzip, deflate",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
         "Cache-Control": "max-age=0",
@@ -97,11 +97,21 @@ def extract_keywords(name: str) -> list[str]:
     return keywords
 
 
+def _keyword_in_text(kw: str, text: str) -> bool:
+    """检查关键词是否作为独立词出现在文本中（词边界匹配）"""
+    # 对短关键词（2-3字母如 ES, KS, CS）使用严格的词边界
+    if len(kw) <= 3:
+        pattern = r'\b' + re.escape(kw) + r'\b'
+        return bool(re.search(pattern, text, re.IGNORECASE))
+    # 长关键词可以直接做子串匹配
+    return kw.lower() in text
+
+
 def match_product(product: dict, search_results: list[dict],
                   min_score: int = 15) -> dict | None:
     """
     将我们的产品与搜索结果进行智能匹配。
-    型号词匹配权重最高，避免错误匹配。
+    型号词匹配权重最高，使用词边界避免错误匹配。
 
     Args:
         product: {code, name, catalog, msrp, status}
@@ -131,10 +141,30 @@ def match_product(product: dict, search_results: list[dict],
 
         score = 0
         model_matched = False
+        wrong_model = False
 
-        # 关键词匹配
+        # 检查结果标题中包含哪些型号词
+        result_models = set()
+        for mk in model_keywords:
+            if _keyword_in_text(mk, result_title):
+                result_models.add(mk.lower())
+
+        # 关键约束：如果产品有型号词，但结果中不含任何该型号词
+        # 且结果中含有其他型号词，则跳过（明显是不同产品）
+        product_models_lower = {mk.lower() for mk in model_keywords}
+        if product_models_lower:
+            if not product_models_lower & result_models:
+                # 结果不含我们产品的型号词
+                if result_models:
+                    # 结果含有其他型号词 → 不同产品，跳过
+                    continue
+                else:
+                    # 结果没有型号词 → 大幅减分但不直接跳过
+                    score -= 30
+
+        # 关键词匹配（使用词边界）
         for kw in keywords:
-            if kw.lower() in result_title:
+            if _keyword_in_text(kw, result_title):
                 score += 10
                 if kw in model_keywords:
                     model_matched = True

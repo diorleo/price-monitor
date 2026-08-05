@@ -43,6 +43,11 @@ class WalmartScraper(BaseScraper):
                     logger.warning(f"[Walmart] Failed to fetch: {query} page {page}")
                     continue
 
+                # 检测 CAPTCHA/反爬页面
+                if 'robot or human' in html.lower() or 'captcha' in html.lower()[:500]:
+                    logger.warning(f"[Walmart] CAPTCHA/bot detection page detected for {query} page {page}")
+                    continue
+
                 page_products = self._parse_search_results(html)
                 if not page_products:
                     logger.info(f"[Walmart] No products on {query} page {page}, stopping")
