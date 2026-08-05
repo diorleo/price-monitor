@@ -1,6 +1,7 @@
 """
-scrapers/base.py — 爬虫基类，封装重试、延时、请求头轮换等反爬逻辑
+scrapers/base.py — 爬虫基类，封装重试、延时、请求头轮换、产品匹配等共享逻辑
 """
+import re
 import time
 import random
 import logging
@@ -67,6 +68,133 @@ def fetch_page(url: str, retries: int = 3, delay: float = 2.0, timeout: int = 20
     return None
 
 
+# ═══════════════════════════════════════════════════════════════
+# 共享：MOZA 产品型号词模式 & 关键词提取
+# ═══════════════════════════════════════════════════════════════
+
+# MOZA 产品型号词模式（含不带数字的型号如 KS, ES, FSR, CS）
+MODEL_PATTERN = re.compile(
+    r'\b[Rr]\d+\b'                          # R系列: R3, R5, R9, R12, R16, R21, R25
+    r'|\b[A-Z]{2,4}\d+\b'                   # 字母+数字: CRP2, SRP2, AB9, AY210, AB6
+    r'|\b[A-Z]{2}-[A-Z]\d*\b'               # 连字符型号: SR-P
+    r'|\b[A-Z]{2}-[A-Z]\b'                  # 连字符无数字: SR-P
+    r'|\b(?:KS|ES|FSR|CS|mBooster|MTLP|AMPCD|CM2|HGP|HBP|SGP|TSW|MRP|MFY|MHG|MTP|MTQ|ESX|AB6|AB9|AY90|AY210|MH16|MA3X|Z-Axis)\b'
+    , re.IGNORECASE
+)
+
+# 系列关键词（辅助匹配，权重较低）
+SERIES_PATTERN = re.compile(
+    r'\b(Flight|Racing|Sim|Bundle|Pedal|Wheel|Base|Grip|Throttle|Rudder|Dashboard|Shifter|Clutch|Truck|Formula|Yoke|Panel|Stalks|Adapter|Clamp|Plate|Mod|Kit|Damper|Hub|Stick|Sidestick|Handbrake|Switch|Knob|Performance|Inversion|Extension|Quick Release|Table|Multi-?function)\b'
+    , re.IGNORECASE
+)
+
+
+def extract_keywords(name: str) -> list[str]:
+    """从产品名中提取关键型号词，如 R5, CRP2, SRP2, R3, R9, KS, ES 等"""
+    keywords = MODEL_PATTERN.findall(name)
+    series = SERIES_PATTERN.findall(name)
+    keywords.extend(series)
+    return keywords
+
+
+def match_product(product: dict, search_results: list[dict],
+                  min_score: int = 15) -> dict | None:
+    """
+    将我们的产品与搜索结果进行智能匹配。
+    型号词匹配权重最高，避免错误匹配。
+
+    Args:
+        product: {code, name, catalog, msrp, status}
+        search_results: [{title, price, url, ...}, ...]
+        min_score: 最低匹配分数
+
+    Returns: 匹配的搜索结果 dict 或 None
+    """
+    product_name = product['name'].lower()
+    keywords = extract_keywords(product['name'])
+
+    # 型号词（R5, CRP2, KS, ES 等）是强匹配信号
+    model_keywords = [kw for kw in keywords
+                      if MODEL_PATTERN.match(kw)]
+
+    best_match = None
+    best_score = 0
+
+    for result in search_results:
+        result_title = result.get('title', '').lower()
+        if not result_title:
+            continue
+
+        # 只考虑包含 "moza" 的结果（排除不相关产品）
+        if 'moza' not in result_title:
+            continue
+
+        score = 0
+        model_matched = False
+
+        # 关键词匹配
+        for kw in keywords:
+            if kw.lower() in result_title:
+                score += 10
+                if kw in model_keywords:
+                    model_matched = True
+                    score += 15  # 型号匹配额外加分
+
+        # 如果产品有型号但结果中没有对应型号，大幅减分
+        if model_keywords and not model_matched:
+            score -= 30
+
+        # 产品名子串匹配
+        name_words = product_name.split()
+        for word in name_words:
+            if len(word) > 2 and word.lower() in result_title:
+                score += 2
+
+        # 完全匹配
+        if product_name in result_title or result_title in product_name:
+            score += 20
+
+        if score > best_score:
+            best_score = score
+            best_match = result
+
+    if best_match and best_score >= min_score:
+        return best_match
+
+    return None
+
+
+def extract_price_from_text(text: str) -> float | None:
+    """从文本中提取价格，支持 $XXX.XX 和 SGD XXX.XX 等格式"""
+    # 先找 $ 价格
+    m = re.search(r'\$\s*([\d,]+\.?\d{2})', text)
+    if m:
+        try:
+            return float(m.group(1).replace(',', ''))
+        except ValueError:
+            pass
+
+    # 找 SGD 或其他货币
+    m = re.search(r'(?:SGD|USD|EUR)\s*([\d,]+\.?\d{2})', text)
+    if m:
+        try:
+            return float(m.group(1).replace(',', ''))
+        except ValueError:
+            pass
+
+    # 纯数字价格
+    m = re.search(r'([\d,]+\.?\d{2})', text)
+    if m:
+        try:
+            val = float(m.group(1).replace(',', ''))
+            if val > 1:  # 过滤掉 0.00 等
+                return val
+        except ValueError:
+            pass
+
+    return None
+
+
 class BaseScraper(ABC):
     """所有渠道爬虫的基类"""
 
@@ -127,3 +255,27 @@ class BaseScraper(ABC):
         if diff_pct > 10:
             return "High"
         return "Normal"
+
+    # 共享方法：批量匹配产品
+    def _match_all_products(self, search_results: list[dict],
+                            fallback_url: str = "") -> list[dict]:
+        """用 match_product 将所有产品匹配到搜索结果，返回结果列表"""
+        results = []
+        active = [p for p in self.products if p.get('status') == 'Active']
+
+        for product in active:
+            matched = match_product(product, search_results)
+            if matched:
+                price = matched.get('price')
+                url = matched.get('url', '')
+                logger.info(f"[{self.channel_name}] Matched {product['code']} -> "
+                           f"{matched.get('title', '')[:50]} @ ${price}")
+                results.append(self._make_result(
+                    product['code'], product['name'], product['msrp'], price, url))
+            else:
+                logger.info(f"[{self.channel_name}] No match for "
+                           f"{product['code']} ({product['name'][:40]})")
+                results.append(self._make_result(
+                    product['code'], product['name'], product['msrp'], None, fallback_url))
+
+        return results
